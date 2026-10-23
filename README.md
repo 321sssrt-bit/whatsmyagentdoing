@@ -4,6 +4,12 @@
 
 ## Install
 
+**Easiest: ask your agent.** Paste this into Claude Code or Codex:
+
+> Install the myoffice skill from https://github.com/Charonyuu/whatsmyagentdoing: clone it with `git clone --depth 1` into `~/.claude/skills/myoffice` (for Codex: `~/.codex/skills/myoffice`), check that `node --version` is 18 or newer, then tell me to start a new session and type /myoffice.
+
+Or do it yourself:
+
 ```bash
 # Claude Code
 git clone --depth 1 https://github.com/Charonyuu/whatsmyagentdoing ~/.claude/skills/myoffice
