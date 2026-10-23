@@ -9,17 +9,18 @@ const TEAM = [
   ['claude', 'api-server', 'Add rate limiting to /v1/orders'],
   ['codex', 'landing-page', 'Make the hero section responsive'],
   ['claude', 'mobile-app', 'Fix the crash on the settings screen'],
-  ['codex', 'data-pipeline', 'Backfill last week of events'],
+  ['gemini', 'data-pipeline', 'Backfill last week of events'],
   ['claude', 'design-system', 'Add a dark variant to Button'],
   ['claude', 'docs-site', 'Write the getting-started guide'],
   ['codex', 'billing', 'Handle failed card retries'],
   ['claude', 'auth-service', 'Rotate the signing keys'],
-  ['codex', 'infra', 'Bump the Postgres instance size'],
+  ['gemini', 'infra', 'Bump the Postgres instance size'],
   ['claude', 'blog', 'Draft the release notes for v2.3'],
 ];
 
 const TOOLS = {
   claude: ['Bash: npm test', 'Edit routes.ts', 'Read schema.prisma', 'Grep "retry"', 'Bash: git diff', 'Write README.md', 'WebSearch “Postgres upgrade”', 'github · create_pull_request'],
+  gemini: ['Shell: npm run lint', 'ReadFile schema.sql', 'WebSearch “pg_upgrade”', 'Edit pipeline.py'],
   codex: ['Shell: pnpm test', 'Shell: rg TODO src', 'Editing app.tsx', 'Shell: npx tsc --noEmit', 'Shell: git status'],
 };
 
@@ -45,7 +46,7 @@ class DemoWatcher extends EventEmitter {
       file: null,
       cwd: `/home/dev/${project}`,
       title: prompt,
-      model: agent === 'claude' ? 'claude-opus-5-5' : 'gpt-5-codex',
+      model: { claude: 'claude-opus-5-5', codex: 'gpt-5-codex', gemini: 'gemini-3-pro' }[agent],
       subagent: false,
       parentId: null,
       status: 'idle',

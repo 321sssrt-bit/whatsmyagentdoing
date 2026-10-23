@@ -41,6 +41,7 @@ function view(s, now, { privacy }) {
     key: `${s.agent}:${s.id}`,
     agent: s.agent,
     id: s.id,
+    sessionId: s.sessionId || null,
     parentId: s.parentId,
     subagent: s.subagent,
     cwd: s.cwd,

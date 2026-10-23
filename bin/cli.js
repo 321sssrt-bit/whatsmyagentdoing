@@ -3,15 +3,15 @@
 
 const http = require('http');
 const { spawn } = require('child_process');
-const { Watcher, CLAUDE_DIR, CODEX_DIR } = require('../src/watcher');
+const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR } = require('../src/watcher');
 const { DemoWatcher } = require('../src/demo');
 const { createServer, snapshot } = require('../src/server');
 const pkg = require('../package.json');
 
 const HELP = `whatsmyagentdoing ${pkg.version}
-See what every Claude Code and Codex agent on this machine is doing, live.
+See what every Claude Code, Codex and Gemini CLI agent on this machine is doing, live.
 
-Usage: npx whatsmyagentdoing [options]
+Usage: node bin/cli.js [options]   (or /myoffice as a skill)
 
 Options:
   -p, --port <n>    Port to serve on (default 4545)
@@ -25,7 +25,8 @@ Options:
 Reads (never writes):
   ${CLAUDE_DIR}
   ${CODEX_DIR}
-Override with CLAUDE_CONFIG_DIR / CODEX_HOME.`;
+  ${GEMINI_DIR}
+Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
 
 function parseArgs(argv) {
   const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false };

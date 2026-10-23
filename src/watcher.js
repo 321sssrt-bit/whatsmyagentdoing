@@ -8,7 +8,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { EventEmitter } = require('events');
-const { newSession, applyClaude, applyCodex } = require('./parsers');
+const crypto = require('crypto');
+const { newSession, applyClaude, applyCodex, applyGemini, applyGeminiDocument } = require('./parsers');
 
 const HEAD_BYTES = 128 * 1024;
 const TAIL_BYTES = 768 * 1024;
@@ -18,6 +19,13 @@ const CLAUDE_DIR = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(home, '.
 const CODEX_HOME = process.env.CODEX_HOME || path.join(home, '.codex');
 const CODEX_DIR = path.join(CODEX_HOME, 'sessions');
 const CODEX_INDEX = path.join(CODEX_HOME, 'session_index.jsonl');
+// Gemini CLI: ~/.gemini (or $GEMINI_CLI_HOME/.gemini); sandboxed runs on
+// macOS keep their state under ~/.cache/.gemini instead.
+const GEMINI_HOMES = [
+  path.join(process.env.GEMINI_CLI_HOME || home, '.gemini'),
+  path.join(home, '.cache', '.gemini'),
+];
+const GEMINI_DIR = path.join(GEMINI_HOMES[0], 'tmp');
 
 function ls(dir) {
   try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
@@ -61,6 +69,31 @@ function claudeFiles() {
   return out;
 }
 
+function geminiFiles() {
+  // <root>/tmp/<project>/chats/session-*.jsonl (+ legacy .json), and
+  // subagents in <root>/tmp/<project>/chats/<parentSessionId>/<id>.jsonl
+  const out = [];
+  for (const root of GEMINI_HOMES) {
+    const tmp = path.join(root, 'tmp');
+    for (const proj of ls(tmp)) {
+      if (!proj.isDirectory()) continue;
+      const chats = path.join(tmp, proj.name, 'chats');
+      for (const e of ls(chats)) {
+        if (e.isFile() && /^session-.*\.jsonl?$/.test(e.name)) {
+          out.push({ agent: 'gemini', file: path.join(chats, e.name), id: e.name.replace(/\.jsonl?$/, ''), project: proj.name, root });
+        } else if (e.isDirectory()) {
+          for (const f of ls(path.join(chats, e.name))) {
+            if (f.isFile() && /\.jsonl$/.test(f.name)) {
+              out.push({ agent: 'gemini', file: path.join(chats, e.name, f.name), id: f.name.slice(0, -6), project: proj.name, root, parentId: e.name });
+            }
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
 function codexFiles(sinceMs) {
   // sessions/YYYY/MM/DD/rollout-*.jsonl — only walk days inside the window.
   const out = [];
@@ -92,6 +125,8 @@ class Watcher extends EventEmitter {
     this.interval = interval;
     this.trackers = new Map(); // file -> { session, offset, partial, apply }
     this.codexNames = new Map();
+    this.geminiProjects = new Map(); // tmp dir name -> project path
+    this.geminiRegistryMtime = 0;
     this.codexIndexMtime = 0;
     this.lastScan = 0;
     this.candidates = [];
@@ -119,15 +154,36 @@ class Watcher extends EventEmitter {
     return true;
   }
 
+  // ~/.gemini/projects.json maps project paths to the short slugs used as
+  // tmp dir names; older versions used sha256(path) instead.
+  loadGeminiProjects() {
+    let mt = 0;
+    const files = GEMINI_HOMES.map((r) => path.join(r, 'projects.json'));
+    for (const f of files) mt += (statSafe(f) || {}).mtimeMs || 0;
+    if (mt === this.geminiRegistryMtime) return false;
+    this.geminiRegistryMtime = mt;
+    for (const f of files) {
+      try {
+        const reg = JSON.parse(fs.readFileSync(f, 'utf8'));
+        for (const [dir, slug] of Object.entries(reg.projects || {})) {
+          this.geminiProjects.set(slug, dir);
+          this.geminiProjects.set(crypto.createHash('sha256').update(dir).digest('hex'), dir);
+        }
+      } catch {}
+    }
+    return true;
+  }
+
   tick() {
     const now = Date.now();
     const since = now - this.windowMs;
     let changed = this.loadCodexIndex();
+    if (this.loadGeminiProjects()) changed = true;
 
     // Directory walk every 5s; stat known files every tick.
     if (now - this.lastScan > 5000) {
       this.lastScan = now;
-      this.candidates = [...claudeFiles(), ...codexFiles(since)];
+      this.candidates = [...claudeFiles(), ...codexFiles(since), ...geminiFiles()];
     }
 
     for (const c of this.candidates) {
@@ -140,7 +196,12 @@ class Watcher extends EventEmitter {
         changed = true;
         continue;
       }
-      if (st.size > t.offset) {
+      if (t.whole && st.mtimeMs !== t.mtime) {
+        // legacy single-document session: re-read it whole
+        this.trackers.delete(c.file);
+        this.open(c, st);
+        changed = true;
+      } else if (st.size > t.offset) {
         this.feed(t, readRange(c.file, t.offset, st.size), false);
         t.offset = st.size;
         changed = true;
@@ -162,7 +223,15 @@ class Watcher extends EventEmitter {
     const session = newSession(c.agent, c.id, c.file);
     if (c.parentId) { session.parentId = c.parentId; session.subagent = true; }
     session.mtime = st.mtimeMs;
-    const t = { session, offset: st.size, partial: '', apply: c.agent === 'claude' ? applyClaude : applyCodex };
+    if (c.agent === 'gemini') session.geminiProject = c.project;
+    const apply = { claude: applyClaude, codex: applyCodex, gemini: applyGemini }[c.agent];
+    const t = { session, offset: st.size, partial: '', apply, mtime: st.mtimeMs };
+    if (c.agent === 'gemini' && c.file.endsWith('.json')) {
+      t.whole = true;
+      try { applyGeminiDocument(session, JSON.parse(readRange(c.file, 0, st.size))); } catch {}
+      this.trackers.set(c.file, t);
+      return t;
+    }
     if (st.size <= HEAD_BYTES + TAIL_BYTES) {
       this.feed(t, readRange(c.file, 0, st.size), false);
     } else {
@@ -192,6 +261,13 @@ class Watcher extends EventEmitter {
     const out = [];
     for (const t of this.trackers.values()) {
       const s = t.session;
+      if (s.agent === 'gemini' && !s.cwd && this.geminiProjects.has(s.geminiProject)) {
+        s.cwd = this.geminiProjects.get(s.geminiProject);
+      }
+      if (s.agent === 'gemini' && !s.cwd) s.cwd = s.geminiProject;
+      // Gemini re-appends whole messages with their original timestamps, so
+      // the file's own write time is the best "last activity" signal.
+      if (s.agent === 'gemini') s.lastEventAt = Math.max(s.lastEventAt || 0, s.mtime || 0);
       if (s.agent === 'codex' && !s.title) {
         const name = this.codexNames.get(s.id);
         if (name) s.title = name;
@@ -202,4 +278,4 @@ class Watcher extends EventEmitter {
   }
 }
 
-module.exports = { Watcher, CLAUDE_DIR, CODEX_DIR };
+module.exports = { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR };

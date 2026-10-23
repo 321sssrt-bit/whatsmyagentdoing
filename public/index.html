@@ -22,6 +22,7 @@
     --idle: #a3a39d;
     --claude: #c96442;
     --codex: #10a37f;
+    --gemini: #4f7cf0;
     --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
   }
   @media (prefers-color-scheme: dark) {
@@ -80,6 +81,7 @@
   .agent { font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 1px 7px; border-radius: 5px; color: #fff; flex: none; }
   .agent.claude { background: var(--claude); }
   .agent.codex { background: var(--codex); }
+  .agent.gemini { background: var(--gemini); }
   .project { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .time { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
   .title { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -162,6 +164,7 @@
         <button data-v="all" class="on" data-t="all"></button>
         <button data-v="claude">Claude</button>
         <button data-v="codex">Codex</button>
+        <button data-v="gemini">Gemini</button>
       </div>
       <label class="tog"><input type="checkbox" id="showSub"> <span data-t="subagents"></span></label>
       <label class="tog" id="idleToggle"><input type="checkbox" id="showIdle"> <span data-t="showIdle"></span></label>
@@ -187,7 +190,7 @@ const I18N = {
     thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you',
     done: 'Done', interrupted: 'Interrupted', error: 'Error',
     copy: 'Copy resume cmd', copied: 'Copied ✓', sub: 'subagent',
-    empty: 'No Claude Code or Codex sessions in the time window. Start one and it shows up here.',
+    empty: 'No Claude Code, Codex or Gemini CLI sessions in the time window. Start one and it shows up here.',
     ago: (s) => s, doneNote: (p) => `${p} is done`,
   },
   zh: {
@@ -197,7 +200,7 @@ const I18N = {
     thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應',
     done: '已完成', interrupted: '已中斷', error: '錯誤',
     copy: '複製接續指令', copied: '已複製 ✓', sub: '子 agent',
-    empty: '這段時間內沒有 Claude Code 或 Codex session。開一個就會出現在這裡。',
+    empty: '這段時間內沒有 Claude Code、Codex 或 Gemini CLI session。開一個就會出現在這裡。',
     ago: (s) => s, doneNote: (p) => `${p} 完成了`,
   },
 };
@@ -224,6 +227,7 @@ const state = {
 };
 
 const ACTIVE = new Set(['thinking', 'tool', 'typing']);
+const AGENT_NAME = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
 const GROUPS = [
   { key: 'needsYou', match: (s) => s === 'waiting' || s === 'error' },
   { key: 'working', match: (s) => ACTIVE.has(s) },
@@ -262,7 +266,9 @@ function timeLabel(s, now) {
 
 function resumeCmd(s) {
   const cd = s.cwd ? `cd ${JSON.stringify(s.cwd)} && ` : '';
-  return s.agent === 'claude' ? `${cd}claude --resume ${s.id}` : `${cd}codex resume ${s.id}`;
+  if (s.agent === 'claude') return `${cd}claude --resume ${s.id}`;
+  if (s.agent === 'gemini') return `${cd}gemini --resume ${s.sessionId || s.id}`;
+  return `${cd}codex resume ${s.id}`;
 }
 
 function card(s, now) {
@@ -277,7 +283,7 @@ function card(s, now) {
   return `
   <div class="card${s.subagent ? ' sub' : ''}${state.flash.has(s.key) ? ' flash' : ''}" data-s="${s.status}" data-key="${esc(s.key)}">
     <div class="top">
-      <span class="agent ${s.agent}">${s.agent === 'claude' ? 'Claude' : 'Codex'}</span>
+      <span class="agent ${s.agent}">${AGENT_NAME[s.agent] || s.agent}</span>
       <span class="project" title="${esc(s.cwd)}">${esc(project)}</span>
       <span class="time" data-time="${esc(s.key)}">${esc(timeLabel(s, now))}</span>
     </div>
@@ -433,7 +439,7 @@ function refreshTip() {
 }
 function hideTip() { tipKey = null; tipPinned = false; tip.style.display = 'none'; tip.classList.remove('pinned'); }
 const officeOpts = {
-  label: (s) => s.project || (s.agent === 'claude' ? 'Claude' : 'Codex'),
+  label: (s) => s.project || AGENT_NAME[s.agent] || s.agent,
   onHover(s, at, click) {
     if (click) {
       if (!s) return hideTip();

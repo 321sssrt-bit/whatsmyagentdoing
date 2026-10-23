@@ -320,4 +320,103 @@ function applyCodex(s, d) {
   }
 }
 
-module.exports = { newSession, applyClaude, applyCodex, clean };
+// --------------------------------------------------------------- Gemini CLI
+//
+// ~/.gemini/tmp/<project>/chats/session-*.jsonl, append-only: a metadata
+// line, then message records. A message is re-appended in full whenever it
+// changes (tool calls finishing etc.), so the last line for an id wins.
+// Older versions wrote a single .json file instead; see applyGeminiDocument.
+
+const GEMINI_PENDING = new Set(['validating', 'scheduled', 'executing']);
+
+function geminiText(content) {
+  if (content == null) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map(geminiText).join('');
+  if (typeof content === 'object' && typeof content.text === 'string') return content.text;
+  return '';
+}
+
+function describeGeminiTool(tc) {
+  const a = tc.args || {};
+  const name = tc.name || tc.displayName || 'tool';
+  const file = a.absolute_path || a.file_path || a.path;
+  switch (name) {
+    case 'run_shell_command':
+      return `Shell: ${short(a.description || a.command)}`;
+    case 'read_file':
+    case 'write_file':
+    case 'replace':
+    case 'edit':
+      return `${tc.displayName || name} ${file ? path.basename(String(file)) : ''}`.trim();
+    case 'glob':
+    case 'search_file_content':
+    case 'grep':
+      return `${tc.displayName || name} ${short(a.pattern, 60)}`;
+    case 'google_web_search':
+      return `WebSearch “${short(a.query, 60)}”`;
+    case 'web_fetch':
+      return `WebFetch ${short(a.url || a.prompt, 60)}`;
+    default:
+      return tc.displayName || name;
+  }
+}
+
+function applyGemini(s, d) {
+  if (!d || typeof d !== 'object') return;
+  // metadata line / $set updates
+  const meta = d.$set || (d.sessionId && !d.type ? d : null);
+  if (meta) {
+    if (meta.sessionId) s.sessionId = meta.sessionId;
+    if (meta.kind === 'subagent') s.subagent = true;
+    if (Array.isArray(meta.directories) && meta.directories[0] && !s.cwd) s.cwd = meta.directories[0];
+    if (meta.summary) s.title = clean(meta.summary, 80);
+    if (meta.startTime) stamp(s, meta.startTime);
+    if (Array.isArray(meta.messages)) for (const m of meta.messages) applyGemini(s, m);
+    return;
+  }
+  if (d.$patch || d.$rewindTo || !d.type) return;
+
+  stamp(s, d.timestamp);
+  switch (d.type) {
+    case 'user': {
+      const text = clean(geminiText(d.displayContent ?? d.content));
+      if (!text) return;
+      if (text.startsWith('/')) { s.prompt = text.split(' ')[0]; } else s.prompt = text;
+      s.reply = null;
+      s.turnStartedAt = d.timestamp ? Date.parse(d.timestamp) : s.turnStartedAt;
+      set(s, 'thinking', null);
+      return;
+    }
+    case 'gemini': {
+      if (d.model) s.model = d.model;
+      const calls = Array.isArray(d.toolCalls) ? d.toolCalls : [];
+      const waiting = calls.find((c) => c.status === 'awaiting_approval');
+      const pending = calls.filter((c) => GEMINI_PENDING.has(c.status));
+      const text = clean(geminiText(d.content));
+      if (waiting) set(s, 'waiting', describeGeminiTool(waiting));
+      else if (pending.length) set(s, 'tool', describeGeminiTool(pending[pending.length - 1]));
+      else if (calls.length && !text) set(s, 'thinking', null); // tools done, model continues
+      else if (text) { s.reply = text; set(s, 'typing', null); }
+      else set(s, 'thinking');
+      return;
+    }
+    case 'error':
+      set(s, 'error', null);
+      s.error = short(geminiText(d.content) || 'Error', 120);
+      return;
+    case 'info':
+    case 'warning': {
+      const t = geminiText(d.content).toLowerCase();
+      if (t.includes('cancel') || t.includes('interrupt')) set(s, 'interrupted', null);
+      return;
+    }
+  }
+}
+
+// Legacy whole-file .json sessions.
+function applyGeminiDocument(s, doc) {
+  applyGemini(s, { $set: doc });
+}
+
+module.exports = { newSession, applyClaude, applyCodex, applyGemini, applyGeminiDocument, clean };
