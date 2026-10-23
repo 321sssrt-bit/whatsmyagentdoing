@@ -21,6 +21,7 @@ const STATUS_COLOR = {
 };
 const CHAR_HEIGHT = 0.92; // world units (≈ tiles)
 const WALL_H = 2.4;
+const SIT_FORWARD = 0.16;
 
 function skyNow() {
   const h = new Date().getHours() + new Date().getMinutes() / 60;
@@ -34,7 +35,14 @@ export class Office3D extends window.Office {
   constructor(root, opts) {
     super(root, opts);
     this.canvas.classList.add('office-overlay');
-    this.gl = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    try {
+      this.gl = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch (e) {
+      // No WebGL here; the page falls back to the 2D office.
+      this.loadError = 'WebGL unavailable';
+      this.markReady(false);
+      return;
+    }
     this.gl.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.gl.shadowMap.enabled = true;
     this.gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -69,12 +77,17 @@ export class Office3D extends window.Office {
     this.blinkers = [];
     this.loaded = false;
     this.clock = new THREE.Clock();
-    this.load().catch((e) => { this.loadError = String(e && e.message || e); });
+    this.load().catch((e) => {
+      this.loadError = String(e && e.message || e);
+      console.error('3D office failed to load:', e);
+      this.markReady(false);
+    });
     this.resize();
   }
 
   destroy() {
     super.destroy();
+    if (!this.gl) return;
     this.controls.dispose();
     this.gl.dispose();
     this.gl.domElement.remove();
@@ -284,18 +297,14 @@ export class Office3D extends window.Office {
     // chair, facing the desk
     const seat = dk.seat;
     this.place('chairDesk', seat.x - 0.3, seat.y - 0.3, 0.6, 0.6, { h: 0.9, rot: dk.side === 's' ? Math.PI : 0 });
-    // glowing screen surface (status colour when someone works here)
+    // The monitor's own screen quad lights up in the worker's status colour.
     if (mon) {
-      const b = new THREE.Box3().setFromObject(mon);
-      const scr = new THREE.Mesh(
-        new THREE.PlaneGeometry((b.max.x - b.min.x) * 0.82, (b.max.y - b.min.y) * 0.55),
-        new THREE.MeshStandardMaterial({ color: 0x222428, emissive: 0x000000, roughness: 0.4 }),
-      );
-      const zFace = dk.side === 's' ? b.max.z + 0.003 : b.min.z - 0.003;
-      scr.position.set((b.min.x + b.max.x) / 2, b.min.y + (b.max.y - b.min.y) * 0.62, zFace);
-      if (dk.side !== 's') scr.rotation.y = Math.PI;
-      this.room.add(scr);
-      this.screens.set(dk, scr);
+      let quad = null;
+      mon.traverse((o) => { if (o.isMesh && o.geometry.attributes.position.count === 4) quad = o; });
+      if (quad) {
+        quad.material = new THREE.MeshStandardMaterial({ color: 0x1b1e24, emissive: 0x000000, roughness: 0.35 });
+        this.screens.set(dk, quad);
+      }
     }
   }
 
@@ -554,7 +563,7 @@ export class Office3D extends window.Office {
     const book = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.04), new THREE.MeshStandardMaterial({ color: 0xc96442 }));
     prop.add(cup, book);
     this.scene.add(obj, prop);
-    a = { obj, mixer, actions, current: null, head, armR, prop, cup, book, yaw: 0, last: { x: p.x, y: p.y } };
+    a = { obj, mixer, actions, current: null, head, headRest: head ? head.rotation.x : 0, armR, prop, cup, book, yaw: 0, last: { x: p.x, y: p.y } };
     this.actors.set(p.key, a);
     return a;
   }
@@ -608,10 +617,15 @@ export class Office3D extends window.Office {
       }
       a.last = { x: p.x, y: p.y };
       a.obj.rotation.y = a.yaw;
-      // Kenney's sit pose puts the hips ~0.3 of the height above the feet.
-      const seatY = st.pose === 'sit' ? Math.max(0, st.sitZ - 0.24) : 0;
-      a.obj.position.set(p.x, seatY, p.y);
-      if (st.act === 'nap' && a.head) a.head.rotation.x += 0.6;
+      const seatY = st.pose === 'sit' ? this.seatHeight(p.x, p.y, st.sitZ) : 0;
+      // The sit pose's torso leans back past its origin; slide the body
+      // forward so the back rests against the backrest instead of in it.
+      const fwd = st.pose === 'sit' ? SIT_FORWARD : 0;
+      a.obj.position.set(p.x + Math.sin(a.yaw) * fwd, seatY, p.y + Math.cos(a.yaw) * fwd);
+      if (a.head) {
+        if (st.act === 'nap') { a.head.rotation.x = a.headRest + 0.55; a.napped = true; }
+        else if (a.napped) { a.head.rotation.x = a.headRest; a.napped = false; }
+      }
       // hand-held props
       a.cup.visible = st.act === 'coffee' || st.act === 'water';
       a.book.visible = st.act === 'read';
@@ -626,6 +640,23 @@ export class Office3D extends window.Office {
     }
   }
 
+  // Kenney's `sit` clip is a sit-on-the-floor pose (seat at the model's
+  // origin), so lift the character to whatever surface is under the seat
+  // point: chair cushion, stool, sofa or beanbag. Measured once per spot.
+  seatHeight(x, y, fallback) {
+    const key = `${x.toFixed(2)},${y.toFixed(2)}`;
+    this.seats = this.seats || new Map();
+    if (this.seats.has(key)) return this.seats.get(key);
+    const ray = new THREE.Raycaster(new THREE.Vector3(x, 1.2, y), new THREE.Vector3(0, -1, 0));
+    let best = 0;
+    for (const h of ray.intersectObject(this.room, true)) {
+      if (h.point.y < 0.75 && h.point.y > best) best = h.point.y;
+    }
+    const v = best > 0.05 ? best : fallback;
+    this.seats.set(key, v);
+    return v;
+  }
+
   // ------------------------------------------------------------ frame
 
   draw() {
@@ -637,15 +668,16 @@ export class Office3D extends window.Office {
       c.globalAlpha = 0.7;
       c.font = '600 14px ui-sans-serif, system-ui, sans-serif';
       c.textAlign = 'center';
-      c.fillText(this.loadError ? `3D failed: ${this.loadError}` : 'Loading 3D office…', this.cw / 2, this.ch / 2);
+      c.fillText(this.loadError ? `3D failed: ${this.loadError}` : '', this.cw / 2, this.ch / 2);
       c.globalAlpha = 1;
-      return;
+      return false;
     }
     if (this.room !== undefined && this.builtPlan === this.plan) {
       // fine
     } else {
       this.build();
       this.builtPlan = this.plan;
+      this.seats = new Map();
       for (const a of this.actors.values()) this.scene.remove(a.obj, a.prop);
       this.actors.clear();
     }
@@ -695,7 +727,8 @@ export class Office3D extends window.Office {
       const a = this.actors.get(p.key);
       if (!a) continue;
       const st = this.stateOf(p);
-      const top = (st.pose === 'sit' ? Math.max(0, st.sitZ - 0.24) + CHAR_HEIGHT * 0.8 : CHAR_HEIGHT) * (p.s.subagent ? 0.8 : 1);
+      const scale = p.s.subagent ? 0.8 : 1;
+      const top = st.pose === 'sit' ? this.seatHeight(p.x, p.y, st.sitZ) + CHAR_HEIGHT * 0.8 * scale : CHAR_HEIGHT * scale;
       v.set(p.x, top + 0.05, p.y).project(this.camera);
       const sx = (v.x + 1) / 2 * this.cw, sy = (1 - v.y) / 2 * this.ch;
       const foot = new THREE.Vector3(p.x, 0, p.y).project(this.camera);

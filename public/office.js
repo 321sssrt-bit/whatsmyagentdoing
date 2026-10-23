@@ -203,6 +203,10 @@
       this.canvas.addEventListener('mouseleave', () => { this.hoverKey = null; this.onHover(null); });
       this.resize();
       this.last = performance.now();
+      // Resolves true once a few frames have been drawn with data in place,
+      // false if the renderer gave up (3D load failure).
+      this.ready = new Promise((ok) => (this.markReady = ok));
+      this.framesShown = 0;
       const loop = (t) => { if (this.dead) return; this.frame(t); this.raf = requestAnimationFrame(loop); };
       this.raf = requestAnimationFrame(loop);
     }
@@ -1449,7 +1453,7 @@
       this.t = now;
       if (!this.visible) return;
       this.step(dt);
-      this.draw();
+      if (this.draw() !== false && !this.first && ++this.framesShown === 3) this.markReady(true);
     }
 
     // Advance people and the cat; shared by the 2D and 3D renderers.

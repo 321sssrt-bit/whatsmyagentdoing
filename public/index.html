@@ -126,6 +126,11 @@
 
   .office { position: relative; height: min(74vh, 820px); min-height: 380px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
   .office-canvas { display: block; }
+  .office canvas { transition: opacity .35s; }
+  .office.loading canvas { opacity: 0; }
+  .office-loader { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); font-size: 13px; z-index: 2; }
+  .office.loading .office-loader { display: flex; }
+  .office-loader .spin { width: 26px; height: 26px; border: 3px solid var(--line); border-top-color: var(--tool); border-radius: 50%; animation: spin .8s linear infinite; }
   .office-gl, .office-overlay { position: absolute; inset: 0; }
   .office-overlay { touch-action: none; }
   .tip { position: fixed; z-index: 10; width: 320px; max-width: calc(100vw - 24px); pointer-events: none; display: none; }
@@ -164,7 +169,7 @@
     </div>
   </header>
   <div id="officeWrap">
-    <div class="office" id="office"></div>
+    <div class="office loading" id="office"><div class="office-loader"><div class="spin"></div><span id="loaderText"></span></div></div>
     <div class="legend" id="legend"></div>
   </div>
   <main id="main"></main>
@@ -177,7 +182,7 @@
 <script>
 const I18N = {
   en: {
-    title: "What's my agent doing", office: 'Office', list: 'List', wentHome: 'went home', qMid: 'Medium', qHigh: 'High (3D)', all: 'All', subagents: 'Subagents', showIdle: 'Idle',
+    title: "What's my agent doing", office: 'Office', list: 'List', wentHome: 'went home', qMid: 'Medium', qHigh: 'High (3D)', loading3d: 'Loading 3D office…', loading2d: 'Setting up the office…', failed3d: "Couldn't load the 3D office — showing Medium instead.", all: 'All', subagents: 'Subagents', showIdle: 'Idle',
     notify: 'Notify when done', notifyOn: 'Notifications on', disconnected: 'Disconnected — retrying…',
     needsYou: 'Needs you', working: 'Working', finished: 'Finished', idle: 'Idle',
     thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you',
@@ -187,7 +192,7 @@ const I18N = {
     ago: (s) => s, doneNote: (p) => `${p} is done`,
   },
   zh: {
-    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', wentHome: '已下班', qMid: '中畫質', qHigh: '高畫質 3D', all: '全部', subagents: '子 agent', showIdle: '閒置',
+    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', wentHome: '已下班', qMid: '中畫質', qHigh: '高畫質 3D', loading3d: '正在載入 3D 辦公室…', loading2d: '正在佈置辦公室…', failed3d: '3D 辦公室載入失敗，先用中畫質顯示。', all: '全部', subagents: '子 agent', showIdle: '閒置',
     notify: '完成時通知我', notifyOn: '通知已開', disconnected: '連線中斷，重試中…',
     needsYou: '需要你', working: '工作中', finished: '已完成', idle: '閒置',
     thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應',
@@ -312,7 +317,9 @@ function render() {
   document.getElementById('officeWrap').style.display = officeMode ? '' : 'none';
   // The office decides who sits at a desk and who wanders around.
   const officeList = all;
-  if (office) {
+  // Wait for the first snapshot so people start at their places instead of
+  // all walking in through the door.
+  if (office && state.loaded) {
     office.setVisible(officeMode);
     office.update(officeList);
   }
@@ -359,6 +366,7 @@ function onData(data) {
     state.prev.set(s.key, s.status);
   }
   state.data = data;
+  state.loaded = true;
   render();
 }
 
@@ -441,19 +449,45 @@ const officeOpts = {
 let office = null;
 let officeKind = null;
 // The 3D office (three.js + models) is only fetched when someone picks it.
+// Until the new office has drawn a settled frame, show a loader instead of a
+// half-built scene.
+const officeEl = document.getElementById('office');
+function setLoading(on, text) {
+  officeEl.classList.toggle('loading', on);
+  if (text) document.getElementById('loaderText').textContent = text;
+}
 async function makeOffice() {
   const kind = state.quality === 'high' ? 'high' : 'mid';
   if (kind === officeKind) return;
   officeKind = kind;
+  setLoading(true, kind === 'high' ? L.loading3d : L.loading2d);
   let Cls = window.Office;
   if (kind === 'high') {
     try { Cls = (await import('/office3d.js')).Office3D; } catch (e) { console.error(e); Cls = window.Office; }
     if (officeKind !== kind) return;
   }
   if (office) office.destroy();
-  office = new Cls(document.getElementById('office'), officeOpts);
+  let mine;
+  try {
+    mine = new Cls(officeEl, officeOpts);
+  } catch (e) {
+    console.error(e);
+    mine = new window.Office(officeEl, officeOpts);
+    if (kind === 'high') { state.quality = 'mid'; store.set('quality', 'mid'); officeKind = 'mid'; syncControls(); }
+  }
+  office = mine;
   office.offDutyLabel = L.wentHome;
   render();
+  const ok = await mine.ready;
+  if (office !== mine) return;
+  if (!ok && kind === 'high') {
+    // 3D failed (no WebGL, missing files…): fall back to the 2D office.
+    setLoading(true, L.failed3d);
+    state.quality = 'mid'; store.set('quality', 'mid'); syncControls();
+    setTimeout(() => makeOffice(), 1200);
+    return;
+  }
+  setLoading(false);
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 document.getElementById('legend').innerHTML = ['thinking', 'tool', 'typing', 'waiting', 'done', 'error']
