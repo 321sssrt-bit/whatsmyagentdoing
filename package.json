@@ -26,5 +26,14 @@
   "license": "MIT",
   "dependencies": {
     "three": "^0.186.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Charonyuu/whatsmyagentdoing.git"
+  },
+  "homepage": "https://github.com/Charonyuu/whatsmyagentdoing#readme",
+  "bugs": {
+    "url": "https://github.com/Charonyuu/whatsmyagentdoing/issues"
+  },
+  "author": "cheoyu"
 }
