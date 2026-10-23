@@ -4,6 +4,7 @@
 const http = require('http');
 const { spawn } = require('child_process');
 const { Watcher, CLAUDE_DIR, CODEX_DIR } = require('../src/watcher');
+const { DemoWatcher } = require('../src/demo');
 const { createServer, snapshot } = require('../src/server');
 const pkg = require('../package.json');
 
@@ -18,6 +19,7 @@ Options:
   --no-open         Don't open the browser
   --private         Hide prompts, replies and titles; show status only
   --json            Print one snapshot as JSON and exit
+  --demo            Show a made-up team instead of your sessions
   -h, --help        Show this help
 
 Reads (never writes):
@@ -26,7 +28,7 @@ Reads (never writes):
 Override with CLAUDE_CONFIG_DIR / CODEX_HOME.`;
 
 function parseArgs(argv) {
-  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false };
+  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') { console.log(HELP); process.exit(0); }
@@ -38,6 +40,7 @@ function parseArgs(argv) {
     else if (a === '--no-open') o.open = false;
     else if (a === '--private') o.privacy = true;
     else if (a === '--json') o.json = true;
+    else if (a === '--demo') o.demo = true;
     else { console.error(`Unknown option: ${a}\n\n${HELP}`); process.exit(1); }
   }
   if (!Number.isFinite(o.port) || !Number.isFinite(o.hours)) { console.error(HELP); process.exit(1); }
@@ -85,7 +88,7 @@ async function main() {
     return;
   }
 
-  const watcher = new Watcher({ hours: o.hours }).start();
+  const watcher = (o.demo ? new DemoWatcher() : new Watcher({ hours: o.hours })).start();
   const server = createServer(watcher, o);
 
   const listen = (port, tries) => {
@@ -96,7 +99,8 @@ async function main() {
     server.listen(port, '127.0.0.1', () => {
       const url = `http://localhost:${port}`;
       const n = watcher.sessions().length;
-      console.log(`whatsmyagentdoing → ${url}  (${n} session${n === 1 ? '' : 's'} in the last ${o.hours}h, Ctrl+C to stop)`);
+      const what = o.demo ? 'demo team' : `${n} session${n === 1 ? '' : 's'} in the last ${o.hours}h`;
+      console.log(`whatsmyagentdoing → ${url}  (${what}, Ctrl+C to stop)`);
       if (o.open) openBrowser(url);
     });
   };

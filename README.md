@@ -2,6 +2,14 @@
 
 **A Claude Code / Codex skill: type `/myoffice` and see what every agent on your machine is doing — live, in a little office.**
 
+![The 3D office: agents at their desks, off-duty ones wandering around](docs/office-3d.gif)
+
+| Medium (2D) | List |
+|---|---|
+| ![2D office](docs/office-2d.gif) | ![List view](docs/list.gif) |
+
+<sub>Recorded with `--demo` (a made-up team), so no real sessions are shown.</sub>
+
 ## Install
 
 **Easiest: ask your agent.** Paste this into Claude Code or Codex:
@@ -49,6 +57,7 @@ Works with Claude Code (CLI, desktop, IDE) and Codex (CLI, desktop, IDE) — any
 --no-open         Don't open the browser
 --private         Hide prompts, replies and titles — status only (screen-share safe)
 --json            Print one snapshot as JSON and exit
+--demo            Show a made-up team instead of your sessions (screenshots, trying it out)
 ```
 
 Running it again while it's up just reopens the tab.
