@@ -14,6 +14,15 @@ node "<base directory>/bin/cli.js"
 ```
 
 If it is already running, the same command just reopens the browser tab.
+
+To **close** it — `/myoffice stop`, or the user asks to stop / close / shut the
+office down — run (not in the background):
+
+```bash
+node "<base directory>/bin/cli.js" --stop
+```
+
+and say it's stopped.
 Then tell the user, in one line, that the office is open at the printed URL.
 Requires Node.js 18+; if `node` is missing, say so and stop.
 
@@ -22,6 +31,7 @@ Options the user may ask for:
 - `--private` — hide prompts/replies, show status only (for screen sharing)
 - `--hours 4` — only sessions active in the last 4 hours (default 24)
 - `--port 5000` — different port (default 4545)
+- `--stop` — stop the running dashboard
 - `--json` — print a one-off snapshot instead of opening a page. Use this when
   the user asks in chat what their other agents are doing: run
   `node "<base directory>/bin/cli.js" --json --hours 2` and summarize by status.

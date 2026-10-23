@@ -20,6 +20,7 @@ Options:
   --private         Hide prompts, replies and titles; show status only
   --json            Print one snapshot as JSON and exit
   --demo            Show a made-up team instead of your sessions
+  --stop            Stop a running dashboard
   -h, --help        Show this help
 
 Reads (never writes):
@@ -29,7 +30,7 @@ Reads (never writes):
 Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
 
 function parseArgs(argv) {
-  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false };
+  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') { console.log(HELP); process.exit(0); }
@@ -42,6 +43,7 @@ function parseArgs(argv) {
     else if (a === '--private') o.privacy = true;
     else if (a === '--json') o.json = true;
     else if (a === '--demo') o.demo = true;
+    else if (a === '--stop') o.stop = true;
     else { console.error(`Unknown option: ${a}\n\n${HELP}`); process.exit(1); }
   }
   if (!Number.isFinite(o.port) || !Number.isFinite(o.hours)) { console.error(HELP); process.exit(1); }
@@ -70,8 +72,27 @@ function alreadyRunning(port) {
   });
 }
 
+function stopAt(port) {
+  return new Promise((resolve) => {
+    const req = http.request({ host: '127.0.0.1', port, path: '/api/shutdown', method: 'POST', timeout: 1500,
+      headers: { 'x-whatsmyagentdoing': 'stop' } }, (res) => { res.resume(); resolve(res.statusCode === 200); });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.end();
+  });
+}
+
 async function main() {
   const o = parseArgs(process.argv.slice(2));
+
+  if (o.stop) {
+    // It may have moved to a later port if the default was taken.
+    const ports = [];
+    for (let p = o.port; p <= o.port + 10; p++) if (await alreadyRunning(p)) ports.push(p);
+    for (const p of ports) await stopAt(p);
+    console.log(ports.length ? `Stopped ${ports.map((p) => `http://localhost:${p}`).join(', ')}` : 'Not running.');
+    return;
+  }
 
   if (o.json) {
     const w = new Watcher({ hours: o.hours });
@@ -90,7 +111,9 @@ async function main() {
   }
 
   const watcher = (o.demo ? new DemoWatcher() : new Watcher({ hours: o.hours })).start();
-  const server = createServer(watcher, o);
+  const server = createServer(watcher, o, {
+    onShutdown: () => { watcher.stop(); server.close(); process.exit(0); },
+  });
 
   const listen = (port, tries) => {
     server.once('error', (err) => {

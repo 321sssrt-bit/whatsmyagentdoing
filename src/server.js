@@ -85,7 +85,7 @@ function snapshot(watcher, opts) {
   return { now, lang: opts.demo ? null : promptLanguage(raw), sessions };
 }
 
-function createServer(watcher, opts) {
+function createServer(watcher, opts, { onShutdown } = {}) {
   const clients = new Set();
   let last = '';
 
@@ -121,6 +121,17 @@ function createServer(watcher, opts) {
     } else if (url.pathname === '/api/sessions') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(snapshot(watcher, opts)));
+    } else if (url.pathname === '/api/shutdown' && req.method === 'POST') {
+      // Only our CLI sends this header; a web page can't add a custom header
+      // to a cross-site request without a CORS preflight, which we never allow.
+      if (req.headers['x-whatsmyagentdoing'] !== 'stop' || !onShutdown) {
+        res.writeHead(403).end();
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      for (const c of clients) c.end();
+      setTimeout(onShutdown, 50);
     } else if (url.pathname === '/api/ping') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ app: 'whatsmyagentdoing' }));

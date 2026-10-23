@@ -60,6 +60,7 @@ Works with Claude Code (CLI, desktop, IDE), Codex (CLI, desktop, IDE) and Gemini
 --private         Hide prompts, replies and titles — status only (screen-share safe)
 --json            Print one snapshot as JSON and exit
 --demo            Show a made-up team instead of your sessions (screenshots, trying it out)
+--stop            Stop a running dashboard (or say /myoffice stop)
 ```
 
 Running it again while it's up just reopens the tab.
