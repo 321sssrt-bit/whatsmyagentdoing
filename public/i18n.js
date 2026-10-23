@@ -1,0 +1,120 @@
+// UI strings. The page picks: your choice in the 🌐 menu, else the language
+// you write your prompts in (worked out by the server), else the browser's
+// language, else English.
+(() => {
+  const S = {
+    en: {
+      langName: 'English', html: 'en',
+      title: "What's my agent doing", office: 'Office', list: 'List', wentHome: 'went home', qMid: 'Medium', qHigh: 'High (3D)',
+      loading3d: 'Loading 3D office…', loading2d: 'Setting up the office…', failed3d: "Couldn't load the 3D office — showing Medium instead.",
+      all: 'All', subagents: 'Subagents', showIdle: 'Idle', notify: 'Notify when done', notifyOn: 'Notifications on', disconnected: 'Disconnected — retrying…',
+      needsYou: 'Needs you', working: 'Working', finished: 'Finished', idle: 'Idle',
+      thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you', done: 'Done', interrupted: 'Interrupted', error: 'Error',
+      copy: 'Copy resume cmd', copied: 'Copied ✓', sub: 'subagent', auto: 'Auto',
+      empty: 'No Claude Code, Codex or Gemini CLI sessions in the time window. Start one and it shows up here.',
+      doneNote: (p) => `${p} is done`,
+    },
+    'zh-TW': {
+      langName: '繁體中文', html: 'zh-Hant',
+      title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', wentHome: '已下班', qMid: '中畫質', qHigh: '高畫質 3D',
+      loading3d: '正在載入 3D 辦公室…', loading2d: '正在佈置辦公室…', failed3d: '3D 辦公室載入失敗，先用中畫質顯示。',
+      all: '全部', subagents: '子 agent', showIdle: '閒置', notify: '完成時通知我', notifyOn: '通知已開', disconnected: '連線中斷，重試中…',
+      needsYou: '需要你', working: '工作中', finished: '已完成', idle: '閒置',
+      thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應', done: '已完成', interrupted: '已中斷', error: '錯誤',
+      copy: '複製接續指令', copied: '已複製 ✓', sub: '子 agent', auto: '自動',
+      empty: '這段時間內沒有 Claude Code、Codex 或 Gemini CLI session。開一個就會出現在這裡。',
+      doneNote: (p) => `${p} 完成了`,
+    },
+    'zh-CN': {
+      langName: '简体中文', html: 'zh-Hans',
+      title: '我的 Agent 在干嘛', office: '办公室', list: '列表', wentHome: '已下班', qMid: '中画质', qHigh: '高画质 3D',
+      loading3d: '正在加载 3D 办公室…', loading2d: '正在布置办公室…', failed3d: '3D 办公室加载失败，先用中画质显示。',
+      all: '全部', subagents: '子 agent', showIdle: '闲置', notify: '完成时通知我', notifyOn: '通知已开启', disconnected: '连接中断，正在重试…',
+      needsYou: '需要你', working: '工作中', finished: '已完成', idle: '闲置',
+      thinking: '思考中', tool: '执行中', typing: '回复中', waiting: '等你回应', done: '已完成', interrupted: '已中断', error: '错误',
+      copy: '复制续接命令', copied: '已复制 ✓', sub: '子 agent', auto: '自动',
+      empty: '这段时间内没有 Claude Code、Codex 或 Gemini CLI 会话。开一个就会出现在这里。',
+      doneNote: (p) => `${p} 完成了`,
+    },
+    ja: {
+      langName: '日本語', html: 'ja',
+      title: 'エージェントは何してる？', office: 'オフィス', list: 'リスト', wentHome: '人が退勤', qMid: '標準', qHigh: '高画質 3D',
+      loading3d: '3D オフィスを読み込み中…', loading2d: 'オフィスを準備中…', failed3d: '3D オフィスを読み込めませんでした。標準で表示します。',
+      all: 'すべて', subagents: 'サブエージェント', showIdle: '待機中', notify: '完了を通知', notifyOn: '通知オン', disconnected: '切断されました — 再接続中…',
+      needsYou: '要対応', working: '作業中', finished: '完了', idle: '待機中',
+      thinking: '考え中', tool: '実行中', typing: '返信中', waiting: 'あなた待ち', done: '完了', interrupted: '中断', error: 'エラー',
+      copy: '再開コマンドをコピー', copied: 'コピーしました ✓', sub: 'サブ', auto: '自動',
+      empty: 'この期間の Claude Code・Codex・Gemini CLI セッションはありません。始めるとここに表示されます。',
+      doneNote: (p) => `${p} が完了しました`,
+    },
+    ko: {
+      langName: '한국어', html: 'ko',
+      title: '내 에이전트는 뭐 하는 중?', office: '사무실', list: '목록', wentHome: '명 퇴근', qMid: '보통', qHigh: '고화질 3D',
+      loading3d: '3D 사무실 불러오는 중…', loading2d: '사무실 준비 중…', failed3d: '3D 사무실을 불러오지 못해 보통 화질로 표시합니다.',
+      all: '전체', subagents: '하위 에이전트', showIdle: '대기', notify: '완료 시 알림', notifyOn: '알림 켜짐', disconnected: '연결 끊김 — 다시 연결 중…',
+      needsYou: '확인 필요', working: '작업 중', finished: '완료', idle: '대기',
+      thinking: '생각 중', tool: '실행 중', typing: '답변 작성 중', waiting: '응답 대기', done: '완료', interrupted: '중단됨', error: '오류',
+      copy: '이어하기 명령 복사', copied: '복사됨 ✓', sub: '하위', auto: '자동',
+      empty: '이 기간에 Claude Code, Codex, Gemini CLI 세션이 없습니다. 시작하면 여기에 나타납니다.',
+      doneNote: (p) => `${p} 완료`,
+    },
+    es: {
+      langName: 'Español', html: 'es',
+      title: '¿Qué hacen mis agentes?', office: 'Oficina', list: 'Lista', wentHome: 'se fueron a casa', qMid: 'Media', qHigh: 'Alta (3D)',
+      loading3d: 'Cargando la oficina 3D…', loading2d: 'Preparando la oficina…', failed3d: 'No se pudo cargar la oficina 3D; se muestra la calidad media.',
+      all: 'Todos', subagents: 'Subagentes', showIdle: 'Inactivos', notify: 'Avisarme al terminar', notifyOn: 'Avisos activados', disconnected: 'Desconectado — reintentando…',
+      needsYou: 'Te necesitan', working: 'Trabajando', finished: 'Terminados', idle: 'Inactivos',
+      thinking: 'Pensando', tool: 'Ejecutando', typing: 'Escribiendo', waiting: 'Esperándote', done: 'Listo', interrupted: 'Interrumpido', error: 'Error',
+      copy: 'Copiar comando', copied: 'Copiado ✓', sub: 'subagente', auto: 'Auto',
+      empty: 'No hay sesiones de Claude Code, Codex ni Gemini CLI en este periodo. Inicia una y aparecerá aquí.',
+      doneNote: (p) => `${p} terminó`,
+    },
+    fr: {
+      langName: 'Français', html: 'fr',
+      title: 'Que font mes agents ?', office: 'Bureau', list: 'Liste', wentHome: 'sont rentrés', qMid: 'Moyenne', qHigh: 'Haute (3D)',
+      loading3d: 'Chargement du bureau 3D…', loading2d: 'Préparation du bureau…', failed3d: 'Impossible de charger le bureau 3D — affichage en qualité moyenne.',
+      all: 'Tous', subagents: 'Sous-agents', showIdle: 'Inactifs', notify: 'Me prévenir à la fin', notifyOn: 'Notifications activées', disconnected: 'Déconnecté — nouvelle tentative…',
+      needsYou: 'Besoin de vous', working: 'Au travail', finished: 'Terminés', idle: 'Inactifs',
+      thinking: 'Réfléchit', tool: 'Exécute', typing: 'Rédige', waiting: 'Vous attend', done: 'Terminé', interrupted: 'Interrompu', error: 'Erreur',
+      copy: 'Copier la commande', copied: 'Copié ✓', sub: 'sous-agent', auto: 'Auto',
+      empty: 'Aucune session Claude Code, Codex ou Gemini CLI sur la période. Lancez-en une, elle apparaîtra ici.',
+      doneNote: (p) => `${p} a terminé`,
+    },
+    de: {
+      langName: 'Deutsch', html: 'de',
+      title: 'Was machen meine Agents?', office: 'Büro', list: 'Liste', wentHome: 'im Feierabend', qMid: 'Mittel', qHigh: 'Hoch (3D)',
+      loading3d: '3D-Büro wird geladen…', loading2d: 'Büro wird eingerichtet…', failed3d: '3D-Büro konnte nicht geladen werden – Anzeige in mittlerer Qualität.',
+      all: 'Alle', subagents: 'Sub-Agents', showIdle: 'Inaktiv', notify: 'Benachrichtigen, wenn fertig', notifyOn: 'Benachrichtigungen an', disconnected: 'Verbindung getrennt – neuer Versuch…',
+      needsYou: 'Braucht dich', working: 'Arbeitet', finished: 'Fertig', idle: 'Inaktiv',
+      thinking: 'Denkt nach', tool: 'Führt aus', typing: 'Schreibt Antwort', waiting: 'Wartet auf dich', done: 'Fertig', interrupted: 'Abgebrochen', error: 'Fehler',
+      copy: 'Befehl kopieren', copied: 'Kopiert ✓', sub: 'Sub-Agent', auto: 'Auto',
+      empty: 'Keine Claude-Code-, Codex- oder Gemini-CLI-Sitzungen im Zeitraum. Starte eine, dann erscheint sie hier.',
+      doneNote: (p) => `${p} ist fertig`,
+    },
+    pt: {
+      langName: 'Português', html: 'pt',
+      title: 'O que meus agentes estão fazendo?', office: 'Escritório', list: 'Lista', wentHome: 'foram para casa', qMid: 'Média', qHigh: 'Alta (3D)',
+      loading3d: 'Carregando o escritório 3D…', loading2d: 'Preparando o escritório…', failed3d: 'Não foi possível carregar o escritório 3D — exibindo em qualidade média.',
+      all: 'Todos', subagents: 'Subagentes', showIdle: 'Ociosos', notify: 'Avisar quando terminar', notifyOn: 'Avisos ativados', disconnected: 'Desconectado — tentando de novo…',
+      needsYou: 'Precisam de você', working: 'Trabalhando', finished: 'Concluídos', idle: 'Ociosos',
+      thinking: 'Pensando', tool: 'Executando', typing: 'Escrevendo', waiting: 'Esperando você', done: 'Concluído', interrupted: 'Interrompido', error: 'Erro',
+      copy: 'Copiar comando', copied: 'Copiado ✓', sub: 'subagente', auto: 'Auto',
+      empty: 'Nenhuma sessão de Claude Code, Codex ou Gemini CLI no período. Inicie uma e ela aparece aqui.',
+      doneNote: (p) => `${p} terminou`,
+    },
+  };
+
+  // Map a browser locale like "zh-HK" or "pt-BR" to one we have.
+  function fromBrowser(list) {
+    for (const raw of list || []) {
+      const l = String(raw).toLowerCase();
+      if (l.startsWith('zh')) return /hans|cn|sg/.test(l) ? 'zh-CN' : 'zh-TW';
+      const base = l.split('-')[0];
+      if (S[base]) return base;
+    }
+    return null;
+  }
+
+  window.I18N = S;
+  window.i18nFromBrowser = fromBrowser;
+})();

@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const http = require('http');
+const { guessFromPrompts } = require('./lang');
 const path = require('path');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -9,6 +10,7 @@ const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/office.js': ['office.js', 'text/javascript; charset=utf-8'],
   '/office3d.js': ['office3d.js', 'text/javascript; charset=utf-8'],
+  '/i18n.js': ['i18n.js', 'text/javascript; charset=utf-8'],
 };
 const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png' };
 // 3D models, served as-is (3D view only).
@@ -64,11 +66,23 @@ function view(s, now, { privacy }) {
   return out;
 }
 
+// The language the user writes their prompts in (recent sessions first);
+// the page uses it as the default UI language.
+function promptLanguage(raw) {
+  const recent = raw
+    .filter((s) => !s.subagent && s.prompt && !s.prompt.startsWith('/'))
+    .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0))
+    .slice(0, 60)
+    .map((s) => s.prompt);
+  return guessFromPrompts(recent);
+}
+
 function snapshot(watcher, opts) {
   const now = Date.now();
-  const sessions = watcher.sessions().map((s) => view(s, now, opts));
+  const raw = watcher.sessions();
+  const sessions = raw.map((s) => view(s, now, opts));
   sessions.sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  return { now, sessions };
+  return { now, lang: opts.demo ? null : promptLanguage(raw), sessions };
 }
 
 function createServer(watcher, opts) {

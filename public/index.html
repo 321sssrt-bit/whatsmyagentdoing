@@ -169,6 +169,7 @@
       <label class="tog"><input type="checkbox" id="showSub"> <span data-t="subagents"></span></label>
       <label class="tog" id="idleToggle"><input type="checkbox" id="showIdle"> <span data-t="showIdle"></span></label>
       <button class="btn" id="notify" data-t="notify"></button>
+      <select class="btn" id="langSel" aria-label="Language"></select>
     </div>
   </header>
   <div id="officeWrap">
@@ -179,34 +180,36 @@
 </div>
 <div class="conn" id="conn" data-t="disconnected"></div>
 <div class="tip" id="tip"></div>
+<script src="/i18n.js"></script>
 <script src="/office.js"></script>
 
 <script>
-const I18N = {
-  en: {
-    title: "What's my agent doing", office: 'Office', list: 'List', wentHome: 'went home', qMid: 'Medium', qHigh: 'High (3D)', loading3d: 'Loading 3D office…', loading2d: 'Setting up the office…', failed3d: "Couldn't load the 3D office — showing Medium instead.", all: 'All', subagents: 'Subagents', showIdle: 'Idle',
-    notify: 'Notify when done', notifyOn: 'Notifications on', disconnected: 'Disconnected — retrying…',
-    needsYou: 'Needs you', working: 'Working', finished: 'Finished', idle: 'Idle',
-    thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you',
-    done: 'Done', interrupted: 'Interrupted', error: 'Error',
-    copy: 'Copy resume cmd', copied: 'Copied ✓', sub: 'subagent',
-    empty: 'No Claude Code, Codex or Gemini CLI sessions in the time window. Start one and it shows up here.',
-    ago: (s) => s, doneNote: (p) => `${p} is done`,
-  },
-  zh: {
-    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', wentHome: '已下班', qMid: '中畫質', qHigh: '高畫質 3D', loading3d: '正在載入 3D 辦公室…', loading2d: '正在佈置辦公室…', failed3d: '3D 辦公室載入失敗，先用中畫質顯示。', all: '全部', subagents: '子 agent', showIdle: '閒置',
-    notify: '完成時通知我', notifyOn: '通知已開', disconnected: '連線中斷，重試中…',
-    needsYou: '需要你', working: '工作中', finished: '已完成', idle: '閒置',
-    thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應',
-    done: '已完成', interrupted: '已中斷', error: '錯誤',
-    copy: '複製接續指令', copied: '已複製 ✓', sub: '子 agent',
-    empty: '這段時間內沒有 Claude Code、Codex 或 Gemini CLI session。開一個就會出現在這裡。',
-    ago: (s) => s, doneNote: (p) => `${p} 完成了`,
-  },
-};
-const L = I18N[(navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en'];
-document.documentElement.lang = L === I18N.zh ? 'zh-Hant' : 'en';
-document.querySelectorAll('[data-t]').forEach((el) => (el.textContent = L[el.dataset.t]));
+// Language: your pick in the 🌐 menu, else the language of your prompts
+// (the server guesses it), else the browser's, else English.
+let L = I18N.en;
+let langCode = 'en';
+let rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto', style: 'short' });
+function chooseLang(serverGuess) {
+  const pick = store.get('lang', 'auto');
+  if (pick !== 'auto' && I18N[pick]) return pick;
+  if (serverGuess && I18N[serverGuess]) return serverGuess;
+  return i18nFromBrowser(navigator.languages || [navigator.language]) || 'en';
+}
+function applyLang(code) {
+  if (code === langCode && L === I18N[code]) return;
+  langCode = code;
+  L = I18N[code];
+  document.documentElement.lang = L.html;
+  rtf = new Intl.RelativeTimeFormat(L.html, { numeric: 'auto', style: 'short' });
+  document.querySelectorAll('[data-t]').forEach((el) => (el.textContent = L[el.dataset.t]));
+  const legend = document.getElementById('legend');
+  if (legend) legend.innerHTML = ['thinking', 'tool', 'typing', 'waiting', 'done', 'error']
+    .map((k) => `<span data-s="${k}"><span class="dot" style="color:var(--s)"></span>${L[k]}</span>`).join('');
+  const sel = document.getElementById('langSel');
+  if (sel) sel.options[0].textContent = `🌐 ${L.auto}`;
+  if (typeof office !== 'undefined' && office) office.offDutyLabel = L.wentHome;
+  if (typeof syncControls === 'function') syncControls();
+}
 
 const store = (() => {
   const get = (k, d) => { try { const v = localStorage.getItem('wmad.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } };
@@ -248,7 +251,6 @@ function dur(ms) {
   return `${h}h ${String(m % 60).padStart(2, '0')}m`;
 }
 
-const rtf = new Intl.RelativeTimeFormat(document.documentElement.lang, { numeric: 'auto', style: 'short' });
 function ago(t, now) {
   const s = Math.round((t - now) / 1000);
   if (s > -45) return rtf.format(0, 'second');
@@ -336,7 +338,7 @@ function render() {
     return;
   }
   if (!list.length) {
-    main.innerHTML = `<div class="empty">${esc(L.empty)}<br><br><code>npx whatsmyagentdoing</code></div>`;
+    main.innerHTML = `<div class="empty">${esc(L.empty)}</div>`;
     return;
   }
   main.innerHTML = GROUPS.map((g) => {
@@ -372,6 +374,7 @@ function onData(data) {
   }
   state.data = data;
   state.loaded = true;
+  applyLang(chooseLang(data.lang));
   render();
 }
 
@@ -495,9 +498,17 @@ async function makeOffice() {
   setLoading(false);
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
-document.getElementById('legend').innerHTML = ['thinking', 'tool', 'typing', 'waiting', 'done', 'error']
-  .map((k) => `<span data-s="${k}"><span class="dot" style="color:var(--s)"></span>${L[k]}</span>`).join('');
 
+const langSel = document.getElementById('langSel');
+langSel.innerHTML = '<option value="auto"></option>' +
+  Object.entries(I18N).map(([k, v]) => `<option value="${k}">${v.langName}</option>`).join('');
+langSel.value = store.get('lang', 'auto');
+langSel.addEventListener('change', () => {
+  store.set('lang', langSel.value);
+  applyLang(chooseLang(state.data.lang));
+  render();
+});
+applyLang(chooseLang(null));
 syncControls();
 makeOffice();
 connect();
