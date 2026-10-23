@@ -11,11 +11,8 @@ const STATIC = {
   '/office3d.js': ['office3d.js', 'text/javascript; charset=utf-8'],
 };
 const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png' };
-// Directories served as-is under a URL prefix (3D view only).
-const MOUNTS = {
-  '/assets/': path.join(__dirname, '..', 'assets'),
-  '/vendor/three/': (() => { try { return path.resolve(path.dirname(require.resolve('three')), '..'); } catch { return null; } })(),
-};
+// 3D models, served as-is (3D view only).
+const MOUNTS = { '/assets/': path.join(__dirname, '..', 'assets') };
 
 function serveFile(res, root, rel) {
   const file = path.normalize(path.join(root, rel));
@@ -105,8 +102,7 @@ function createServer(watcher, opts) {
       fs.createReadStream(path.join(PUBLIC, file)).pipe(res);
     } else if (Object.keys(MOUNTS).some((m) => url.pathname.startsWith(m))) {
       const m = Object.keys(MOUNTS).find((k) => url.pathname.startsWith(k));
-      if (!MOUNTS[m]) res.writeHead(404).end();
-      else serveFile(res, MOUNTS[m], decodeURIComponent(url.pathname.slice(m.length)));
+      serveFile(res, MOUNTS[m], decodeURIComponent(url.pathname.slice(m.length)));
     } else if (url.pathname === '/api/sessions') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(snapshot(watcher, opts)));

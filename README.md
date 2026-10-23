@@ -1,14 +1,24 @@
 # 👀 whatsmyagentdoing
 
-**One command to see what every Claude Code and Codex agent on your machine is doing — live, in your browser.**
+**A Claude Code / Codex skill: type `/myoffice` and see what every agent on your machine is doing — live, in a little office.**
+
+## Install
 
 ```bash
-npx whatsmyagentdoing
+# Claude Code
+git clone --depth 1 https://github.com/Charonyuu/whatsmyagentdoing ~/.claude/skills/myoffice
+
+# Codex
+git clone --depth 1 https://github.com/Charonyuu/whatsmyagentdoing ~/.codex/skills/myoffice
 ```
 
-It opens an isometric **office**. Agents that are working sit at cubicle desks: a thought bubble while thinking, typing with code scrolling on the monitor while a tool runs, standing up and waving when they need you. A handful of recently finished agents stay around off duty and wander: coffee and water in the pantry, the couch and beanbags, the bookshelf, the meeting-room whiteboard, the arcade cabinet, ping-pong and foosball (when two of them are free), the phone booth, or a nap at an empty desk. Everyone else has gone home. There's an office cat, and the windows follow your local time of day. Hover anyone to see what they're on.
+Then type **`/myoffice`** (or just ask *"what are my agents doing?"*). The office opens in your browser. Update later with `git -C ~/.claude/skills/myoffice pull`.
 
-Two looks: **Medium** is a hand-drawn 2D canvas (zero dependencies). **High (3D)** renders the same office with real-time lighting and shadows using [Kenney](https://kenney.nl)'s CC0 *Mini Characters* (with their walk / sit / interact animations) and *Furniture Kit*; drag to rotate, scroll to zoom. three.js and the models (~1.3 MB, meshopt-compressed) only load when you pick High.
+Needs Node.js 18+. Nothing to `npm install` — the repo runs as cloned. Prefer no skill? `node bin/cli.js` from a clone works too.
+
+It opens an isometric **office**. Agents that are working sit at cubicle desks: a thought bubble while thinking, typing with code scrolling on the monitor while a tool runs, standing up and waving when they need you. A handful of recently finished agents stay around off duty and wander: coffee and water in the pantry, the couch and beanbags, the bookshelf, the meeting-room whiteboard, the arcade cabinet, ping-pong and foosball (when two of them are free), the phone booth, or a nap at an empty desk. Everyone else has gone home. The windows follow your local time of day (and in Medium there's an office cat). Hover anyone to see what they're on.
+
+Two looks: **Medium** is a hand-drawn 2D canvas (zero dependencies). **High (3D)** renders the same office with real-time lighting and shadows using [Kenney](https://kenney.nl)'s CC0 *Mini Characters* (with their walk / sit / interact animations) and *Furniture Kit*; drag to rotate, scroll to zoom. The 3D bundle (three.js, ~180 KB gzipped) and models (~1.3 MB, meshopt-compressed) only load when you pick High.
 
 Prefer plain cards? Switch to **List**. Either way, each session updates in real time:
 
@@ -24,20 +34,6 @@ Prefer plain cards? Switch to **List**. Either way, each session updates in real
 In list view, sessions are grouped into **Needs you → Working → Finished**, with a live timer for the current turn, a copy button for the resume command (`claude --resume …` / `codex resume …`), optional browser notifications when an agent finishes, and filters for Claude / Codex / subagents. The tab title shows how many agents are working.
 
 Works with Claude Code (CLI, desktop, IDE) and Codex (CLI, desktop, IDE) — anything that writes session logs to disk.
-
-## Install as a skill
-
-So you (or your agent) can just say *"what are my agents doing?"*:
-
-```bash
-# Claude Code
-git clone https://github.com/Charonyuu/whatsmyagentdoing /tmp/wmad && cp -r /tmp/wmad/skills/whatsmyagentdoing ~/.claude/skills/
-
-# Codex
-git clone https://github.com/Charonyuu/whatsmyagentdoing /tmp/wmad && cp -r /tmp/wmad/skills/whatsmyagentdoing ~/.codex/skills/
-```
-
-Then `/whatsmyagentdoing` in Claude Code, or ask either agent to show your agents.
 
 ## Options
 
@@ -60,7 +56,7 @@ No hooks, no config, no API keys. Both tools already append every message and to
 
 `whatsmyagentdoing` tails those files (read-only), turns the latest event into a status, and pushes it to the page over Server-Sent Events. Set `CLAUDE_CONFIG_DIR` / `CODEX_HOME` if yours live elsewhere.
 
-**Privacy:** nothing leaves your machine. The server binds to `127.0.0.1` only and rejects requests that aren't addressed to localhost. One dependency (`three`, used only by the 3D view) — read `src/` in five minutes.
+**Privacy:** nothing leaves your machine. The server binds to `127.0.0.1` only and rejects requests that aren't addressed to localhost. No runtime dependencies — read `src/` in five minutes. (`web/office3d.js` is the 3D source; `npm run build` bundles it with three.js into `public/office3d.js`.)
 
 ## Limits
 
