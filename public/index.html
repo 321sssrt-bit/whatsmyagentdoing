@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's my agent doing</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👀</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6f3;
+    --panel: #ffffff;
+    --ink: #1c1c1a;
+    --muted: #6d6d68;
+    --faint: #a3a39d;
+    --line: #e4e3dd;
+    --thinking: #7c5cdb;
+    --tool: #2f7dd1;
+    --typing: #1f9d6b;
+    --waiting: #d98a0b;
+    --done: #5b8a4a;
+    --error: #d1453b;
+    --idle: #a3a39d;
+    --claude: #c96442;
+    --codex: #10a37f;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413;
+      --panel: #1e1e1c;
+      --ink: #ecebe6;
+      --muted: #a09f99;
+      --faint: #6b6a65;
+      --line: #2e2d2a;
+      --thinking: #a48bf0;
+      --tool: #5ea4ee;
+      --typing: #3fc48f;
+      --waiting: #f0a93a;
+      --done: #86b872;
+      --error: #f0675d;
+      --idle: #6b6a65;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font: 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 22px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+  h1 span { color: var(--muted); font-weight: 500; }
+  .summary { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+  .controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+  .seg button { border: 0; background: none; color: var(--muted); padding: 5px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--ink); color: var(--bg); }
+  label.tog { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); cursor: pointer; user-select: none; }
+  .btn { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 5px 11px; border-radius: 8px; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .btn:hover { color: var(--ink); }
+
+  section { margin-top: 26px; }
+  section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+  section h2 .n { color: var(--faint); font-weight: 500; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } .controls { margin-left: 0; } }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; min-width: 0; position: relative; transition: border-color .3s; }
+  .card.sub { padding: 10px 12px; gap: 6px; }
+  .card.flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 3px var(--done); } 100% { box-shadow: var(--shadow); } }
+  .card[data-s="waiting"], .card[data-s="error"] { border-color: color-mix(in srgb, var(--s) 55%, var(--line)); }
+  .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .agent { font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 1px 7px; border-radius: 5px; color: #fff; flex: none; }
+  .agent.claude { background: var(--claude); }
+  .agent.codex { background: var(--codex); }
+  .project { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .time { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+  .title { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: flex; align-items: center; gap: 8px; color: var(--s); font-weight: 600; font-size: 13px; min-width: 0; }
+  .status .act { color: var(--ink); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .q, .r { font-size: 12.5px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+  .q::before { content: "› "; color: var(--faint); }
+  .r { color: var(--ink); opacity: .85; }
+  .r::before { content: "← "; color: var(--faint); }
+  .err { font-size: 12.5px; color: var(--error); }
+  .foot { display: flex; gap: 8px; align-items: center; color: var(--faint); font-size: 11.5px; min-width: 0; }
+  .foot .model { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .copy { margin-left: auto; border: 0; background: none; color: var(--faint); font: inherit; font-size: 11.5px; cursor: pointer; padding: 0; flex: none; }
+  .copy:hover { color: var(--ink); }
+
+  [data-s="thinking"] { --s: var(--thinking); }
+  [data-s="tool"] { --s: var(--tool); }
+  [data-s="typing"] { --s: var(--typing); }
+  [data-s="waiting"] { --s: var(--waiting); }
+  [data-s="done"] { --s: var(--done); }
+  [data-s="interrupted"] { --s: var(--idle); }
+  [data-s="error"] { --s: var(--error); }
+  [data-s="idle"] { --s: var(--idle); }
+
+  .ind { width: 18px; height: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; flex: none; }
+  .ind i { width: 4px; height: 4px; border-radius: 50%; background: var(--s); display: none; }
+  [data-s="thinking"] .ind i { display: block; }
+  [data-s="thinking"] .ind i { animation: bob 1.2s infinite ease-in-out; }
+  [data-s="thinking"] .ind i:nth-child(2) { animation-delay: .15s; }
+  [data-s="thinking"] .ind i:nth-child(3) { animation-delay: .3s; }
+  @keyframes bob { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+  [data-s="tool"] .ind::before { content: ""; width: 11px; height: 11px; border: 2px solid var(--s); border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  [data-s="typing"] .ind::before { content: ""; width: 2px; height: 13px; background: var(--s); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  [data-s="waiting"] .ind::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--s); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--s) 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+  [data-s="done"] .ind::before { content: "✓"; color: var(--s); font-weight: 700; }
+  [data-s="error"] .ind::before { content: "!"; color: var(--s); font-weight: 800; }
+  [data-s="interrupted"] .ind::before { content: "■"; color: var(--s); font-size: 9px; }
+  [data-s="idle"] .ind::before { content: "–"; color: var(--s); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+
+  .empty { text-align: center; color: var(--muted); padding: 60px 16px; border: 1px dashed var(--line); border-radius: 12px; }
+  .empty code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
+  .conn { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--error); color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; display: none; }
+  .conn.on { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>👀 <span data-t="title"></span></h1>
+    <div class="summary" id="summary"></div>
+    <div class="controls">
+      <div class="seg" id="agentSeg">
+        <button data-v="all" class="on" data-t="all"></button>
+        <button data-v="claude">Claude</button>
+        <button data-v="codex">Codex</button>
+      </div>
+      <label class="tog"><input type="checkbox" id="showSub"> <span data-t="subagents"></span></label>
+      <label class="tog"><input type="checkbox" id="showIdle"> <span data-t="showIdle"></span></label>
+      <button class="btn" id="notify" data-t="notify"></button>
+    </div>
+  </header>
+  <main id="main"></main>
+</div>
+<div class="conn" id="conn" data-t="disconnected"></div>
+
+<script>
+const I18N = {
+  en: {
+    title: "What's my agent doing", all: 'All', subagents: 'Subagents', showIdle: 'Idle',
+    notify: 'Notify when done', notifyOn: 'Notifications on', disconnected: 'Disconnected — retrying…',
+    needsYou: 'Needs you', working: 'Working', finished: 'Finished', idle: 'Idle',
+    thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you',
+    done: 'Done', interrupted: 'Interrupted', error: 'Error',
+    copy: 'Copy resume cmd', copied: 'Copied ✓', sub: 'subagent',
+    empty: 'No Claude Code or Codex sessions in the time window. Start one and it shows up here.',
+    ago: (s) => s, doneNote: (p) => `${p} is done`,
+  },
+  zh: {
+    title: '我的 Agent 在幹嘛', all: '全部', subagents: '子 agent', showIdle: '閒置',
+    notify: '完成時通知我', notifyOn: '通知已開', disconnected: '連線中斷，重試中…',
+    needsYou: '需要你', working: '工作中', finished: '已完成', idle: '閒置',
+    thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應',
+    done: '已完成', interrupted: '已中斷', error: '錯誤',
+    copy: '複製接續指令', copied: '已複製 ✓', sub: '子 agent',
+    empty: '這段時間內沒有 Claude Code 或 Codex session。開一個就會出現在這裡。',
+    ago: (s) => s, doneNote: (p) => `${p} 完成了`,
+  },
+};
+const L = I18N[(navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en'];
+document.documentElement.lang = L === I18N.zh ? 'zh-Hant' : 'en';
+document.querySelectorAll('[data-t]').forEach((el) => (el.textContent = L[el.dataset.t]));
+
+const store = (() => {
+  const get = (k, d) => { try { const v = localStorage.getItem('wmad.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+  const set = (k, v) => { try { localStorage.setItem('wmad.' + k, JSON.stringify(v)); } catch {} };
+  return { get, set };
+})();
+
+const state = {
+  agent: store.get('agent', 'all'),
+  showSub: store.get('showSub', false),
+  showIdle: store.get('showIdle', false),
+  data: { now: Date.now(), sessions: [] },
+  skew: 0,
+  prev: new Map(),
+  flash: new Set(),
+};
+
+const ACTIVE = new Set(['thinking', 'tool', 'typing']);
+const GROUPS = [
+  { key: 'needsYou', match: (s) => s === 'waiting' || s === 'error' },
+  { key: 'working', match: (s) => ACTIVE.has(s) },
+  { key: 'finished', match: (s) => s === 'done' || s === 'interrupted' },
+  { key: 'idle', match: (s) => s === 'idle' },
+];
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function dur(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${String(m % 60).padStart(2, '0')}m`;
+}
+
+const rtf = new Intl.RelativeTimeFormat(document.documentElement.lang, { numeric: 'auto', style: 'short' });
+function ago(t, now) {
+  const s = Math.round((t - now) / 1000);
+  if (s > -45) return rtf.format(0, 'second');
+  const m = Math.round(s / 60);
+  if (m > -60) return rtf.format(m, 'minute');
+  const h = Math.round(m / 60);
+  if (h > -24) return rtf.format(h, 'hour');
+  return rtf.format(Math.round(h / 24), 'day');
+}
+
+function timeLabel(s, now) {
+  if ((ACTIVE.has(s.status) || s.status === 'waiting') && s.turnStartedAt) return dur(now - s.turnStartedAt);
+  return s.lastEventAt ? ago(s.lastEventAt, now) : '';
+}
+
+function resumeCmd(s) {
+  const cd = s.cwd ? `cd ${JSON.stringify(s.cwd)} && ` : '';
+  return s.agent === 'claude' ? `${cd}claude --resume ${s.id}` : `${cd}codex resume ${s.id}`;
+}
+
+function card(s, now) {
+  const project = s.project || (s.cwd ? s.cwd : '—');
+  const title = s.title && s.title !== project ? `<div class="title" title="${esc(s.title)}">${esc(s.title)}</div>` : '';
+  const act = s.activity ? `<span class="act" title="${esc(s.activity)}">${esc(s.activity)}</span>` : '';
+  const showText = !s.subagent || ACTIVE.has(s.status);
+  const q = showText && s.prompt ? `<div class="q" title="${esc(s.prompt)}">${esc(s.prompt)}</div>` : '';
+  const r = showText && s.reply && !ACTIVE.has(s.status) ? `<div class="r" title="${esc(s.reply)}">${esc(s.reply)}</div>` : '';
+  const err = s.error ? `<div class="err">${esc(s.error)}</div>` : '';
+  const sub = s.subagent ? ` · ${L.sub}` : '';
+  return `
+  <div class="card${s.subagent ? ' sub' : ''}${state.flash.has(s.key) ? ' flash' : ''}" data-s="${s.status}" data-key="${esc(s.key)}">
+    <div class="top">
+      <span class="agent ${s.agent}">${s.agent === 'claude' ? 'Claude' : 'Codex'}</span>
+      <span class="project" title="${esc(s.cwd)}">${esc(project)}</span>
+      <span class="time" data-time="${esc(s.key)}">${esc(timeLabel(s, now))}</span>
+    </div>
+    ${title}
+    <div class="status"><span class="ind"><i></i><i></i><i></i></span>${esc(L[s.status] || s.status)}${act}</div>
+    ${err}${q}${r}
+    <div class="foot"><span class="model">${esc((s.model || '') + sub)}</span><button class="copy" data-copy="${esc(resumeCmd(s))}">${L.copy}</button></div>
+  </div>`;
+}
+
+function visible() {
+  return state.data.sessions.filter((s) =>
+    (state.agent === 'all' || s.agent === state.agent) &&
+    (state.showSub || !s.subagent) &&
+    (state.showIdle || s.status !== 'idle'));
+}
+
+function render() {
+  const now = Date.now() - state.skew;
+  const list = visible();
+  const all = state.data.sessions.filter((s) => (state.agent === 'all' || s.agent === state.agent) && (state.showSub || !s.subagent));
+
+  const count = (f) => all.filter((s) => f(s.status)).length;
+  document.getElementById('summary').innerHTML = GROUPS.slice(0, 3).map((g) => {
+    const n = count(g.match);
+    const color = g.key === 'needsYou' ? 'var(--waiting)' : g.key === 'working' ? 'var(--tool)' : 'var(--done)';
+    return `<span class="chip"><span class="dot" style="color:${color}"></span>${L[g.key]} <b>${n}</b></span>`;
+  }).join('');
+
+  const working = count((s) => ACTIVE.has(s));
+  const needs = count(GROUPS[0].match);
+  document.title = (needs ? `(${needs}!) ` : working ? `(${working}) ` : '') + L.title;
+
+  const main = document.getElementById('main');
+  if (!list.length) {
+    main.innerHTML = `<div class="empty">${esc(L.empty)}<br><br><code>npx whatsmyagentdoing</code></div>`;
+    return;
+  }
+  main.innerHTML = GROUPS.map((g) => {
+    const items = list.filter((s) => g.match(s.status));
+    if (!items.length) return '';
+    return `<section><h2>${L[g.key]} <span class="n">${items.length}</span></h2><div class="grid">${items.map((s) => card(s, now)).join('')}</div></section>`;
+  }).join('');
+}
+
+function tickTimes() {
+  const now = Date.now() - state.skew;
+  const byKey = new Map(state.data.sessions.map((s) => [s.key, s]));
+  document.querySelectorAll('[data-time]').forEach((el) => {
+    const s = byKey.get(el.dataset.time);
+    if (s) el.textContent = timeLabel(s, now);
+  });
+}
+
+function onData(data) {
+  state.skew = Date.now() - data.now;
+  const first = state.prev.size === 0;
+  state.flash.clear();
+  for (const s of data.sessions) {
+    const before = state.prev.get(s.key);
+    if (!first && before && ACTIVE.has(before) && (s.status === 'done' || s.status === 'waiting')) {
+      state.flash.add(s.key);
+      if (!s.subagent && window.Notification && Notification.permission === 'granted') {
+        try { new Notification(s.status === 'done' ? L.doneNote(s.project || s.agent) : `${s.project || s.agent}: ${L.waiting}`, { body: s.reply || s.activity || '', tag: s.key }); } catch {}
+      }
+    }
+    state.prev.set(s.key, s.status);
+  }
+  state.data = data;
+  render();
+}
+
+function connect() {
+  const es = new EventSource('/events');
+  const conn = document.getElementById('conn');
+  es.onmessage = (e) => { conn.classList.remove('on'); onData(JSON.parse(e.data)); };
+  es.onerror = () => conn.classList.add('on');
+}
+
+document.getElementById('agentSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.agent = b.dataset.v; store.set('agent', state.agent); syncControls(); render();
+});
+const showSub = document.getElementById('showSub');
+const showIdle = document.getElementById('showIdle');
+showSub.addEventListener('change', () => { state.showSub = showSub.checked; store.set('showSub', state.showSub); render(); });
+showIdle.addEventListener('change', () => { state.showIdle = showIdle.checked; store.set('showIdle', state.showIdle); render(); });
+
+const notifyBtn = document.getElementById('notify');
+function syncControls() {
+  document.querySelectorAll('#agentSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.agent));
+  showSub.checked = state.showSub;
+  showIdle.checked = state.showIdle;
+  if (!window.Notification) notifyBtn.style.display = 'none';
+  else if (Notification.permission === 'granted') { notifyBtn.textContent = L.notifyOn; notifyBtn.disabled = true; }
+}
+notifyBtn.addEventListener('click', () => Notification.requestPermission().then(syncControls));
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  navigator.clipboard?.writeText(b.dataset.copy).then(() => {
+    b.textContent = L.copied; setTimeout(() => (b.textContent = L.copy), 1400);
+  });
+});
+
+syncControls();
+connect();
+setInterval(tickTimes, 1000);
+</script>
+</body>
+</html>
