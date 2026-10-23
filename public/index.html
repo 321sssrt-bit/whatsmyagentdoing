@@ -123,6 +123,13 @@
   [data-s="idle"] .ind::before { content: "–"; color: var(--s); }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 
+  .office { position: relative; height: min(74vh, 820px); min-height: 380px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
+  .office-canvas { display: block; }
+  .tip { position: fixed; z-index: 10; width: 320px; max-width: calc(100vw - 24px); pointer-events: none; display: none; }
+  .tip.pinned { pointer-events: auto; }
+  .tip .card { box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; color: var(--muted); font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .empty { text-align: center; color: var(--muted); padding: 60px 16px; border: 1px dashed var(--line); border-radius: 12px; }
   .empty code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
   .conn { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--error); color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; display: none; }
@@ -135,6 +142,10 @@
     <h1>👀 <span data-t="title"></span></h1>
     <div class="summary" id="summary"></div>
     <div class="controls">
+      <div class="seg" id="viewSeg">
+        <button data-v="office" data-t="office"></button>
+        <button data-v="list" data-t="list"></button>
+      </div>
       <div class="seg" id="agentSeg">
         <button data-v="all" class="on" data-t="all"></button>
         <button data-v="claude">Claude</button>
@@ -145,14 +156,20 @@
       <button class="btn" id="notify" data-t="notify"></button>
     </div>
   </header>
+  <div id="officeWrap">
+    <div class="office" id="office"></div>
+    <div class="legend" id="legend"></div>
+  </div>
   <main id="main"></main>
 </div>
 <div class="conn" id="conn" data-t="disconnected"></div>
+<div class="tip" id="tip"></div>
+<script src="/office.js"></script>
 
 <script>
 const I18N = {
   en: {
-    title: "What's my agent doing", all: 'All', subagents: 'Subagents', showIdle: 'Idle',
+    title: "What's my agent doing", office: 'Office', list: 'List', all: 'All', subagents: 'Subagents', showIdle: 'Idle',
     notify: 'Notify when done', notifyOn: 'Notifications on', disconnected: 'Disconnected — retrying…',
     needsYou: 'Needs you', working: 'Working', finished: 'Finished', idle: 'Idle',
     thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you',
@@ -162,7 +179,7 @@ const I18N = {
     ago: (s) => s, doneNote: (p) => `${p} is done`,
   },
   zh: {
-    title: '我的 Agent 在幹嘛', all: '全部', subagents: '子 agent', showIdle: '閒置',
+    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', all: '全部', subagents: '子 agent', showIdle: '閒置',
     notify: '完成時通知我', notifyOn: '通知已開', disconnected: '連線中斷，重試中…',
     needsYou: '需要你', working: '工作中', finished: '已完成', idle: '閒置',
     thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應',
@@ -183,6 +200,7 @@ const store = (() => {
 })();
 
 const state = {
+  view: store.get('view', 'office'),
   agent: store.get('agent', 'all'),
   showSub: store.get('showSub', false),
   showIdle: store.get('showIdle', false),
@@ -281,6 +299,19 @@ function render() {
   document.title = (needs ? `(${needs}!) ` : working ? `(${working}) ` : '') + L.title;
 
   const main = document.getElementById('main');
+  const officeMode = state.view === 'office';
+  document.getElementById('officeWrap').style.display = officeMode ? '' : 'none';
+  office.setVisible(officeMode);
+  // Office keeps the floor readable: agents that finished long ago went home.
+  const officeList = state.showIdle ? list : list.filter((s) =>
+    !['done', 'interrupted'].includes(s.status) || now - (s.lastEventAt || 0) < 2 * 3600_000);
+  office.update(officeList);
+  if (officeMode) {
+    main.innerHTML = officeList.length ? '' : `<div class="empty">${esc(L.empty)}</div>`;
+    document.getElementById('officeWrap').style.display = officeList.length ? '' : 'none';
+    refreshTip();
+    return;
+  }
   if (!list.length) {
     main.innerHTML = `<div class="empty">${esc(L.empty)}<br><br><code>npx whatsmyagentdoing</code></div>`;
     return;
@@ -293,6 +324,7 @@ function render() {
 }
 
 function tickTimes() {
+  if (tipKey) refreshTip();
   const now = Date.now() - state.skew;
   const byKey = new Map(state.data.sessions.map((s) => [s.key, s]));
   document.querySelectorAll('[data-time]').forEach((el) => {
@@ -326,6 +358,10 @@ function connect() {
   es.onerror = () => conn.classList.add('on');
 }
 
+document.getElementById('viewSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.view = b.dataset.v; store.set('view', state.view); hideTip(); syncControls(); render();
+});
 document.getElementById('agentSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   state.agent = b.dataset.v; store.set('agent', state.agent); syncControls(); render();
@@ -338,6 +374,7 @@ showIdle.addEventListener('change', () => { state.showIdle = showIdle.checked; s
 const notifyBtn = document.getElementById('notify');
 function syncControls() {
   document.querySelectorAll('#agentSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.agent));
+  document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.view));
   showSub.checked = state.showSub;
   showIdle.checked = state.showIdle;
   if (!window.Notification) notifyBtn.style.display = 'none';
@@ -351,6 +388,42 @@ document.addEventListener('click', (e) => {
     b.textContent = L.copied; setTimeout(() => (b.textContent = L.copy), 1400);
   });
 });
+
+// ---- office view
+const tip = document.getElementById('tip');
+let tipKey = null, tipPinned = false, tipAt = { x: 0, y: 0 };
+function placeTip() {
+  const r = tip.getBoundingClientRect();
+  let x = tipAt.x + 16, y = tipAt.y + 16;
+  if (x + r.width > innerWidth - 8) x = tipAt.x - r.width - 16;
+  if (y + r.height > innerHeight - 8) y = Math.max(8, innerHeight - r.height - 8);
+  tip.style.left = Math.max(8, x) + 'px';
+  tip.style.top = y + 'px';
+}
+function refreshTip() {
+  if (!tipKey) return;
+  const s = state.data.sessions.find((x) => x.key === tipKey);
+  if (!s) return hideTip();
+  tip.innerHTML = card(s, Date.now() - state.skew);
+  placeTip();
+}
+function hideTip() { tipKey = null; tipPinned = false; tip.style.display = 'none'; tip.classList.remove('pinned'); }
+const office = new Office(document.getElementById('office'), {
+  label: (s) => s.project || (s.agent === 'claude' ? 'Claude' : 'Codex'),
+  onHover(s, at, click) {
+    if (click) {
+      if (!s) return hideTip();
+      tipPinned = true; tip.classList.add('pinned');
+    } else if (tipPinned) return;
+    if (!s) { if (!tipPinned) hideTip(); return; }
+    tipKey = s.key; tipAt = at;
+    tip.style.display = 'block';
+    refreshTip();
+  },
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
+document.getElementById('legend').innerHTML = ['thinking', 'tool', 'typing', 'waiting', 'done', 'error']
+  .map((k) => `<span data-s="${k}"><span class="dot" style="color:var(--s)"></span>${L[k]}</span>`).join('');
 
 syncControls();
 connect();

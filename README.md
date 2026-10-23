@@ -6,7 +6,9 @@
 npx whatsmyagentdoing
 ```
 
-Each session gets a card that updates in real time:
+It opens an isometric **office**: every agent gets a desk and a little person. They think (thought bubble), type away while a tool runs (code scrolling on the monitor), stand up and wave when they need you, and walk to the lounge for a coffee when they finish. New sessions walk in through the door; closed ones walk out. Hover anyone to see what they're on.
+
+Prefer plain cards? Switch to **List**. Either way, each session updates in real time:
 
 | Status | Meaning |
 |---|---|
@@ -17,7 +19,7 @@ Each session gets a card that updates in real time:
 | ✅ Done | turn finished, with the last reply |
 | ■ Interrupted / ❗ Error / – Idle | |
 
-Sessions are grouped into **Needs you → Working → Finished**, with a live timer for the current turn, a copy button for the resume command (`claude --resume …` / `codex resume …`), optional browser notifications when an agent finishes, and filters for Claude / Codex / subagents. The tab title shows how many agents are working.
+In list view, sessions are grouped into **Needs you → Working → Finished**, with a live timer for the current turn, a copy button for the resume command (`claude --resume …` / `codex resume …`), optional browser notifications when an agent finishes, and filters for Claude / Codex / subagents. The tab title shows how many agents are working.
 
 Works with Claude Code (CLI, desktop, IDE) and Codex (CLI, desktop, IDE) — anything that writes session logs to disk.
 

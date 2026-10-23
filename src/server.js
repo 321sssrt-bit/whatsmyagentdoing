@@ -4,7 +4,8 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
-const INDEX = path.join(__dirname, '..', 'public', 'index.html');
+const PUBLIC = path.join(__dirname, '..', 'public');
+const STATIC = { '/': ['index.html', 'text/html; charset=utf-8'], '/office.js': ['office.js', 'text/javascript; charset=utf-8'] };
 const ACTIVE = new Set(['thinking', 'tool', 'typing']);
 
 // Logs only record finished blocks, so a few states need a clock to resolve:
@@ -77,9 +78,10 @@ function createServer(watcher, opts) {
       return;
     }
     const url = new URL(req.url, 'http://localhost');
-    if (url.pathname === '/') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-      fs.createReadStream(INDEX).pipe(res);
+    if (STATIC[url.pathname]) {
+      const [file, type] = STATIC[url.pathname];
+      res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
+      fs.createReadStream(path.join(PUBLIC, file)).pipe(res);
     } else if (url.pathname === '/api/sessions') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(snapshot(watcher, opts)));
