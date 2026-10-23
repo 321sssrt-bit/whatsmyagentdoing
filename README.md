@@ -8,6 +8,8 @@ npx whatsmyagentdoing
 
 It opens an isometric **office**. Agents that are working sit at cubicle desks: a thought bubble while thinking, typing with code scrolling on the monitor while a tool runs, standing up and waving when they need you. A handful of recently finished agents stay around off duty and wander: coffee and water in the pantry, the couch and beanbags, the bookshelf, the meeting-room whiteboard, the arcade cabinet, ping-pong and foosball (when two of them are free), the phone booth, or a nap at an empty desk. Everyone else has gone home. There's an office cat, and the windows follow your local time of day. Hover anyone to see what they're on.
 
+Two looks: **Medium** is a hand-drawn 2D canvas (zero dependencies). **High (3D)** renders the same office with real-time lighting and shadows using [Kenney](https://kenney.nl)'s CC0 *Mini Characters* (with their walk / sit / interact animations) and *Furniture Kit*; drag to rotate, scroll to zoom. three.js and the models (~1.3 MB, meshopt-compressed) only load when you pick High.
+
 Prefer plain cards? Switch to **List**. Either way, each session updates in real time:
 
 | Status | Meaning |
@@ -58,7 +60,7 @@ No hooks, no config, no API keys. Both tools already append every message and to
 
 `whatsmyagentdoing` tails those files (read-only), turns the latest event into a status, and pushes it to the page over Server-Sent Events. Set `CLAUDE_CONFIG_DIR` / `CODEX_HOME` if yours live elsewhere.
 
-**Privacy:** nothing leaves your machine. The server binds to `127.0.0.1` only and rejects requests that aren't addressed to localhost. Zero dependencies — read `src/` in five minutes.
+**Privacy:** nothing leaves your machine. The server binds to `127.0.0.1` only and rejects requests that aren't addressed to localhost. One dependency (`three`, used only by the 3D view) — read `src/` in five minutes.
 
 ## Limits
 
@@ -68,4 +70,4 @@ No hooks, no config, no API keys. Both tools already append every message and to
 
 ## License
 
-MIT
+MIT. 3D models in `assets/kenney/` are by [Kenney](https://kenney.nl), released under CC0 (see the license files there).

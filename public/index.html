@@ -126,6 +126,8 @@
 
   .office { position: relative; height: min(74vh, 820px); min-height: 380px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
   .office-canvas { display: block; }
+  .office-gl, .office-overlay { position: absolute; inset: 0; }
+  .office-overlay { touch-action: none; }
   .tip { position: fixed; z-index: 10; width: 320px; max-width: calc(100vw - 24px); pointer-events: none; display: none; }
   .tip.pinned { pointer-events: auto; }
   .tip .card { box-shadow: 0 8px 30px rgba(0,0,0,.18); }
@@ -147,6 +149,10 @@
         <button data-v="office" data-t="office"></button>
         <button data-v="list" data-t="list"></button>
       </div>
+      <div class="seg" id="qualSeg">
+        <button data-v="mid" data-t="qMid"></button>
+        <button data-v="high" data-t="qHigh"></button>
+      </div>
       <div class="seg" id="agentSeg">
         <button data-v="all" class="on" data-t="all"></button>
         <button data-v="claude">Claude</button>
@@ -165,12 +171,13 @@
 </div>
 <div class="conn" id="conn" data-t="disconnected"></div>
 <div class="tip" id="tip"></div>
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 <script src="/office.js"></script>
 
 <script>
 const I18N = {
   en: {
-    title: "What's my agent doing", office: 'Office', list: 'List', wentHome: 'went home', all: 'All', subagents: 'Subagents', showIdle: 'Idle',
+    title: "What's my agent doing", office: 'Office', list: 'List', wentHome: 'went home', qMid: 'Medium', qHigh: 'High (3D)', all: 'All', subagents: 'Subagents', showIdle: 'Idle',
     notify: 'Notify when done', notifyOn: 'Notifications on', disconnected: 'Disconnected — retrying…',
     needsYou: 'Needs you', working: 'Working', finished: 'Finished', idle: 'Idle',
     thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you',
@@ -180,7 +187,7 @@ const I18N = {
     ago: (s) => s, doneNote: (p) => `${p} is done`,
   },
   zh: {
-    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', wentHome: '已下班', all: '全部', subagents: '子 agent', showIdle: '閒置',
+    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', wentHome: '已下班', qMid: '中畫質', qHigh: '高畫質 3D', all: '全部', subagents: '子 agent', showIdle: '閒置',
     notify: '完成時通知我', notifyOn: '通知已開', disconnected: '連線中斷，重試中…',
     needsYou: '需要你', working: '工作中', finished: '已完成', idle: '閒置',
     thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應',
@@ -202,6 +209,7 @@ const store = (() => {
 
 const state = {
   view: store.get('view', 'office'),
+  quality: store.get('quality', 'mid'),
   agent: store.get('agent', 'all'),
   showSub: store.get('showSub', false),
   showIdle: store.get('showIdle', false),
@@ -302,10 +310,12 @@ function render() {
   const main = document.getElementById('main');
   const officeMode = state.view === 'office';
   document.getElementById('officeWrap').style.display = officeMode ? '' : 'none';
-  office.setVisible(officeMode);
   // The office decides who sits at a desk and who wanders around.
   const officeList = all;
-  office.update(officeList);
+  if (office) {
+    office.setVisible(officeMode);
+    office.update(officeList);
+  }
   document.getElementById('idleToggle').style.display = officeMode ? 'none' : '';
   if (officeMode) {
     main.innerHTML = officeList.length ? '' : `<div class="empty">${esc(L.empty)}</div>`;
@@ -359,6 +369,10 @@ function connect() {
   es.onerror = () => conn.classList.add('on');
 }
 
+document.getElementById('qualSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.quality = b.dataset.v; store.set('quality', state.quality); hideTip(); syncControls(); makeOffice();
+});
 document.getElementById('viewSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   state.view = b.dataset.v; store.set('view', state.view); hideTip(); syncControls(); render();
@@ -376,6 +390,8 @@ const notifyBtn = document.getElementById('notify');
 function syncControls() {
   document.querySelectorAll('#agentSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.agent));
   document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.view));
+  document.querySelectorAll('#qualSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.quality));
+  document.getElementById('qualSeg').style.display = state.view === 'office' ? '' : 'none';
   showSub.checked = state.showSub;
   showIdle.checked = state.showIdle;
   if (!window.Notification) notifyBtn.style.display = 'none';
@@ -409,7 +425,7 @@ function refreshTip() {
   placeTip();
 }
 function hideTip() { tipKey = null; tipPinned = false; tip.style.display = 'none'; tip.classList.remove('pinned'); }
-const office = new Office(document.getElementById('office'), {
+const officeOpts = {
   label: (s) => s.project || (s.agent === 'claude' ? 'Claude' : 'Codex'),
   onHover(s, at, click) {
     if (click) {
@@ -421,13 +437,30 @@ const office = new Office(document.getElementById('office'), {
     tip.style.display = 'block';
     refreshTip();
   },
-});
-office.offDutyLabel = L.wentHome;
+};
+let office = null;
+let officeKind = null;
+// The 3D office (three.js + models) is only fetched when someone picks it.
+async function makeOffice() {
+  const kind = state.quality === 'high' ? 'high' : 'mid';
+  if (kind === officeKind) return;
+  officeKind = kind;
+  let Cls = window.Office;
+  if (kind === 'high') {
+    try { Cls = (await import('/office3d.js')).Office3D; } catch (e) { console.error(e); Cls = window.Office; }
+    if (officeKind !== kind) return;
+  }
+  if (office) office.destroy();
+  office = new Cls(document.getElementById('office'), officeOpts);
+  office.offDutyLabel = L.wentHome;
+  render();
+}
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 document.getElementById('legend').innerHTML = ['thinking', 'tool', 'typing', 'waiting', 'done', 'error']
   .map((k) => `<span data-s="${k}"><span class="dot" style="color:var(--s)"></span>${L[k]}</span>`).join('');
 
 syncControls();
+makeOffice();
 connect();
 setInterval(tickTimes, 1000);
 </script>

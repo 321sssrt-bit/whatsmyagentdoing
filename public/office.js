@@ -196,14 +196,22 @@
       this.cat = { x: this.plan.W - 3, y: this.plan.D - 2, path: [], until: 0, face: 1 };
       matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => (this.pal = palette()));
 
-      new ResizeObserver(() => this.resize()).observe(root);
+      this.ro = new ResizeObserver(() => this.resize());
+      this.ro.observe(root);
       this.canvas.addEventListener('mousemove', (e) => this.pointer(e));
       this.canvas.addEventListener('click', (e) => this.pointer(e, true));
       this.canvas.addEventListener('mouseleave', () => { this.hoverKey = null; this.onHover(null); });
       this.resize();
       this.last = performance.now();
-      const loop = (t) => { this.frame(t); requestAnimationFrame(loop); };
-      requestAnimationFrame(loop);
+      const loop = (t) => { if (this.dead) return; this.frame(t); this.raf = requestAnimationFrame(loop); };
+      this.raf = requestAnimationFrame(loop);
+    }
+
+    destroy() {
+      this.dead = true;
+      cancelAnimationFrame(this.raf);
+      this.ro.disconnect();
+      this.canvas.remove();
     }
 
     // ------------------------------------------------------------ floor plan
@@ -225,6 +233,10 @@
       const pois = [];
       const desks = [];
       const add = (depth, draw) => items.push({ depth, draw });
+      // Semantic list of what is where, for renderers that don't use the 2D
+      // draw closures (the 3D view).
+      const props = [];
+      const prop = (t, o) => props.push({ t, ...o });
       const solid = (x, y, w, d, pad) => grid.block(x, y, w, d, pad);
       const poi = (x, y, act, face, opt = {}) => pois.push({ x, y, act, face, sit: 0, ...opt });
 
@@ -256,6 +268,8 @@
           solid(x, py + 0.92, 1.4, 0.8, 0.08);
         }
         longBox(px - 0.1, py + 0.82, 0, 3.15, 0.08, 1.15, this.shade(panel, 25), panel, this.shade(panel, -15), { bias: 0.05 });
+        prop('panel', { x: px - 0.1, y: py + 0.82, w: 3.15, d: 0.08, h: 1.15, color: panel });
+        prop('panel', { x: px - 0.18, y: py - 0.05, w: 0.08, d: 1.82, h: 1.15, color: panel });
         add(px - 0.1 + py + 0.86, () => this.box(px - 0.18, py - 0.05, 0, 0.08, 1.82, 1.15, this.shade(panel, 25), panel, this.shade(panel, -15)));
         solid(px - 0.18, py + 0.8, 3.25, 0.12, 0.05);
       }
@@ -263,10 +277,12 @@
       // ---- open office extras
       const rx = OW - 1.15;
       add(rx + 0.35 + 0.5, () => this.serverRack(rx, 0.2));
+      prop('rack', { x: rx, y: 0.2 });
+      prop('printer', { x: OW - 2.3, y: 0.25 });
       solid(rx, 0.2, 0.7, 0.6);
       add(OW - 2.3 + 0.3 + 0.5, () => this.printer(OW - 2.3, 0.25));
       solid(OW - 2.3, 0.25, 0.75, 0.55);
-      for (const [x, y] of [[0.45, 0.45], [0.45, OD - 0.2]]) { add(x + y, () => this.plant(x, y)); solid(x - 0.2, y - 0.2, 0.4, 0.4); }
+      for (const [x, y] of [[0.45, 0.45], [0.45, OD - 0.2]]) { add(x + y, () => this.plant(x, y)); prop('plant', { x, y }); solid(x - 0.2, y - 0.2, 0.4, 0.4); }
       const windows = [];
       for (let x = 1.0; x < OW - 2.6; x += 2.4) {
         windows.push(x);
@@ -277,6 +293,7 @@
       // ---- ping-pong corner
       const tx = 2.4, ty = OD + 1.0;
       add(tx + 1.3 + ty + 0.7, () => this.pingpong(tx, ty));
+      prop('pingpong', { x: tx, y: ty });
       solid(tx, ty, 2.6, 1.4, 0.05);
       poi(tx - 0.55, ty + 0.7, 'pingpong', 'side', { pair: 'pp' });
       poi(tx + 3.15, ty + 0.7, 'pingpong', 'side', { pair: 'pp' });
@@ -286,6 +303,8 @@
       const fy = OD + 3.7;
       if (D - fy >= 3.4) {
         add(0.5 + fy + 0.4, () => this.vending(0.12, fy, '#c0392b'));
+        prop('vending', { x: 0.12, y: fy, color: '#c0392b' });
+        prop('vending', { x: 0.12, y: fy + 0.8, color: '#2f6fb0' });
         add(0.5 + fy + 1.2, () => this.vending(0.12, fy + 0.8, '#2f6fb0'));
         solid(0.1, fy, 0.75, 1.55);
         poi(1.3, fy + 0.4, 'vending', 'back');
@@ -294,44 +313,59 @@
       if (D - fy >= 2.2) {
         const fx = 3.0, fby = fy + 0.4;
         add(fx + 0.8 + fby + 0.4, () => this.foosball(fx, fby));
+        prop('foosball', { x: fx, y: fby });
         solid(fx, fby, 1.6, 0.8, 0.05);
         poi(fx - 0.45, fby + 0.4, 'foosball', 'side', { pair: 'fb' });
         poi(fx + 2.05, fby + 0.4, 'foosball', 'side', { pair: 'fb' });
         const bx = OW - 2.0, by = fy;
         this.booth(add, bx, by);
+        prop('booth', { x: bx, y: by });
         solid(bx - 0.05, by - 0.05, 1.4, 0.1, 0.03);
         solid(bx - 0.05, by - 0.05, 0.1, 1.4, 0.03);
         solid(bx + 1.25, by - 0.05, 0.1, 1.4, 0.03);
         solid(bx + 0.85, by + 1.25, 0.5, 0.1, 0.03);
         poi(bx + 0.65, by + 0.6, 'phone', 'front', { sit: 0.45 });
         add(OW - 0.45 + D - 0.6, () => this.plant(OW - 0.45, D - 0.6));
+        prop('plant', { x: OW - 0.45, y: D - 0.6 });
       }
 
       // ---- meeting room behind glass, door at y 3.6–4.6
       const mx = OW;
       for (const [y, d] of [[0, 1], [1, 1], [2, 1], [3, 0.6], [4.6, MR - 4.6]]) this.glassX(add, mx, y, d);
       for (let x = mx; x < W - 0.01; x += 1) this.glassY(add, x, MR, Math.min(1, W - x));
+      prop('glass', { x: mx, y: 0, w: 0, d: 3.6 });
+      prop('glass', { x: mx, y: 4.6, w: 0, d: MR - 4.6 });
+      prop('glass', { x: mx, y: MR, w: RW, d: 0 });
       solid(mx - 0.05, 0, 0.1, 3.6, 0.05);
       solid(mx - 0.05, 4.6, 0.1, MR - 4.6, 0.05);
       solid(mx, MR - 0.05, RW, 0.1, 0.05);
       const mtx = mx + 1.6, mty = 1.7;
       add(mtx + 1.5 + mty + 0.7, () => this.meetingTable(mtx, mty));
+      prop('meetingTable', { x: mtx, y: mty, w: 3.0, d: 1.4 });
       solid(mtx, mty, 3.0, 1.4);
       for (let k = 0; k < 3; k++) {
         const cx = mtx + 0.5 + k * 1.0;
         add(cx + mty - 0.45, () => this.stool(cx, mty - 0.4, 0.4, '#555c66'));
         add(cx + mty + 1.78, () => this.stool(cx, mty + 1.8, 0.4, '#555c66'));
         poi(cx, mty - 0.4, 'meeting', 'front', { sit: 0.42 });
+        prop('chair', { x: cx, y: mty - 0.4, face: 'front' });
+        prop('chair', { x: cx, y: mty + 1.8, face: 'back' });
         poi(cx, mty + 1.8, 'meeting', 'back', { sit: 0.42 });
       }
       poi(mx + 3.6, 0.65, 'whiteboard', 'back');
       add(W - 0.45 + 0.45, () => this.plant(W - 0.45, 0.45));
+      prop('plant', { x: W - 0.45, y: 0.45 });
       solid(W - 0.65, 0.25, 0.4, 0.4);
 
       // ---- pantry
       const cy = MR + 0.3;
       longBox(mx + 1.0, cy, 0, RW - 2.3, 0.7, 0.9, pal.counter, pal.counterL, pal.counterR, { bias: -0.5 });
       solid(mx + 1.0, cy, RW - 2.3, 0.7);
+      prop('counter', { x: mx + 1.0, y: cy, w: RW - 2.3, d: 0.7 });
+      prop('coffee', { x: mx + 2.4, y: cy + 0.12 });
+      prop('sink', { x: mx + 3.9, y: cy + 0.12 });
+      prop('fridge', { x: W - 1.15, y: cy });
+      prop('cooler', { x: mx + 0.35, y: cy + 0.05 });
       add(mx + 2.65 + cy + 0.35, () => this.coffeeMachine(mx + 2.4, cy + 0.12));
       add(mx + 4.15 + cy + 0.35, () => this.sink(mx + 3.9, cy + 0.12));
       add(W - 0.75 + cy + 0.4, () => this.fridge(W - 1.15, cy));
@@ -344,10 +378,12 @@
       poi(mx + 0.6, cy + 0.95, 'water', 'back');
       const rtx = mx + 3.6, rty = MR + 2.9;
       add(rtx + rty, () => this.roundTable(rtx, rty));
+      prop('roundTable', { x: rtx, y: rty });
       solid(rtx - 0.45, rty - 0.45, 0.9, 0.9);
       for (const [sx, sy, face] of [[rtx - 1.0, rty, 'front'], [rtx + 1.0, rty, 'front'], [rtx, rty + 1.0, 'back'], [rtx, rty - 0.95, 'front']]) {
         add(sx + sy - 0.02, () => this.stool(sx, sy, 0.45, '#c9a24c'));
         poi(sx, sy, 'stool', face, { sit: 0.47 });
+        prop('barStool', { x: sx, y: sy });
       }
 
       // ---- lounge
@@ -357,9 +393,14 @@
         extra: (x0, x1) => this.books(x0, x1, PY + 0.2),
       });
       solid(shelfX, PY - 0.25, shelfW, 0.45);
+      prop('shelf', { x: shelfX, y: PY - 0.25, w: shelfW, d: 0.45 });
       poi(mx + 4.6, PY + 0.75, 'read', 'back');
       poi(mx + 5.8, PY + 0.75, 'read', 'back');
       add(lx + ly + 0.6, () => this.couch(lx, ly + 0.6));
+      prop('couch', { x: lx, y: ly + 0.6, w: 2.8, d: 0.8 });
+      prop('coffeeTable', { x: lx + 0.6, y: ly + 2.0, w: 1.6, d: 0.7 });
+      prop('beanbag', { x: lx + 0.4, y: ly + 3.6, color: '#c96442' });
+      prop('beanbag', { x: lx + 2.6, y: ly + 3.6, color: '#7d93c4' });
       solid(lx, ly + 0.6, 2.8, 0.8);
       for (let k = 0; k < 3; k++) poi(lx + 0.5 + k * 0.9, ly + 1.2, 'couch', 'front', { sit: 0.36 });
       add(lx + 1.4 + ly + 2.35, () => this.coffeeTable(lx + 0.6, ly + 2.0));
@@ -370,6 +411,10 @@
       poi(lx + 2.6, ly + 3.6, 'beanbag', 'front', { sit: 0.18 });
       const ax = W - 1.2, ay = ly + 1.0;
       add(ax + 0.35 + ay + 0.35, () => this.arcade(ax, ay));
+      prop('arcade', { x: ax, y: ay });
+      prop('plant', { x: W - 0.5, y: D - 0.5 });
+      prop('lamp', { x: lx - 0.2, y: D - 0.6 });
+      prop('rug', { x: OW + 0.3, y: PY + 0.6, w: 4.0, d: D - PY - 1.0 });
       solid(ax, ay, 0.7, 0.7);
       poi(ax + 0.35, ay + 1.15, 'arcade', 'back');
       add(W - 0.5 + D - 0.5, () => this.plant(W - 0.5, D - 0.5));
@@ -379,7 +424,7 @@
         { y: 2.2, color: '#c96442', text: 'SHIP IT' },
         { y: 4.6, color: '#10a37f', text: 'TESTS ✓' },
       ];
-      return { W, D, OW, OD, MR, PY, RW, grid, items, pois, desks, windows, posters, pp, door: { x: 0.4, y: D - 1.2 } };
+      return { W, D, OW, OD, MR, PY, RW, grid, items, props, pois, desks, windows, posters, pp, door: { x: 0.4, y: D - 1.2 } };
     }
 
     glassX(add, x, y, d) {
@@ -1403,8 +1448,13 @@
       this.last = now;
       this.t = now;
       if (!this.visible) return;
-      const wall = Date.now();
+      this.step(dt);
+      this.draw();
+    }
 
+    // Advance people and the cat; shared by the 2D and 3D renderers.
+    step(dt) {
+      const wall = Date.now();
       for (const [k, p] of this.people) {
         if (p.mode === 'wander') {
           if (p.poi && !p.path.length && p.until === Infinity) p.until = wall + p.stay;
@@ -1421,7 +1471,9 @@
         }
       }
       this.moveCat(dt, wall);
+    }
 
+    draw() {
       const c = this.ctx;
       c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       c.clearRect(0, 0, this.cw, this.ch);
