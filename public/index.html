@@ -152,7 +152,7 @@
         <button data-v="codex">Codex</button>
       </div>
       <label class="tog"><input type="checkbox" id="showSub"> <span data-t="subagents"></span></label>
-      <label class="tog"><input type="checkbox" id="showIdle"> <span data-t="showIdle"></span></label>
+      <label class="tog" id="idleToggle"><input type="checkbox" id="showIdle"> <span data-t="showIdle"></span></label>
       <button class="btn" id="notify" data-t="notify"></button>
     </div>
   </header>
@@ -169,7 +169,7 @@
 <script>
 const I18N = {
   en: {
-    title: "What's my agent doing", office: 'Office', list: 'List', all: 'All', subagents: 'Subagents', showIdle: 'Idle',
+    title: "What's my agent doing", office: 'Office', list: 'List', wentHome: 'went home', all: 'All', subagents: 'Subagents', showIdle: 'Idle',
     notify: 'Notify when done', notifyOn: 'Notifications on', disconnected: 'Disconnected — retrying…',
     needsYou: 'Needs you', working: 'Working', finished: 'Finished', idle: 'Idle',
     thinking: 'Thinking', tool: 'Running', typing: 'Writing reply', waiting: 'Waiting for you',
@@ -179,7 +179,7 @@ const I18N = {
     ago: (s) => s, doneNote: (p) => `${p} is done`,
   },
   zh: {
-    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', all: '全部', subagents: '子 agent', showIdle: '閒置',
+    title: '我的 Agent 在幹嘛', office: '辦公室', list: '列表', wentHome: '已下班', all: '全部', subagents: '子 agent', showIdle: '閒置',
     notify: '完成時通知我', notifyOn: '通知已開', disconnected: '連線中斷，重試中…',
     needsYou: '需要你', working: '工作中', finished: '已完成', idle: '閒置',
     thinking: '思考中', tool: '執行中', typing: '回覆中', waiting: '等你回應',
@@ -302,10 +302,10 @@ function render() {
   const officeMode = state.view === 'office';
   document.getElementById('officeWrap').style.display = officeMode ? '' : 'none';
   office.setVisible(officeMode);
-  // Office keeps the floor readable: agents that finished long ago went home.
-  const officeList = state.showIdle ? list : list.filter((s) =>
-    !['done', 'interrupted'].includes(s.status) || now - (s.lastEventAt || 0) < 2 * 3600_000);
+  // The office decides who sits at a desk and who wanders around.
+  const officeList = all;
   office.update(officeList);
+  document.getElementById('idleToggle').style.display = officeMode ? 'none' : '';
   if (officeMode) {
     main.innerHTML = officeList.length ? '' : `<div class="empty">${esc(L.empty)}</div>`;
     document.getElementById('officeWrap').style.display = officeList.length ? '' : 'none';
@@ -421,6 +421,7 @@ const office = new Office(document.getElementById('office'), {
     refreshTip();
   },
 });
+office.offDutyLabel = L.wentHome;
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 document.getElementById('legend').innerHTML = ['thinking', 'tool', 'typing', 'waiting', 'done', 'error']
   .map((k) => `<span data-s="${k}"><span class="dot" style="color:var(--s)"></span>${L[k]}</span>`).join('');

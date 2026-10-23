@@ -6,7 +6,7 @@
 npx whatsmyagentdoing
 ```
 
-It opens an isometric **office**: every agent gets a desk and a little person. They think (thought bubble), type away while a tool runs (code scrolling on the monitor), stand up and wave when they need you, and walk to the lounge for a coffee when they finish. New sessions walk in through the door; closed ones walk out. Hover anyone to see what they're on.
+It opens an isometric **office**. Agents that are working sit at cubicle desks: a thought bubble while thinking, typing with code scrolling on the monitor while a tool runs, standing up and waving when they need you. A handful of recently finished agents stay around off duty and wander: coffee and water in the pantry, the couch and beanbags, the bookshelf, the meeting-room whiteboard, the arcade cabinet, ping-pong and foosball (when two of them are free), the phone booth, or a nap at an empty desk. Everyone else has gone home. There's an office cat, and the windows follow your local time of day. Hover anyone to see what they're on.
 
 Prefer plain cards? Switch to **List**. Either way, each session updates in real time:
 
