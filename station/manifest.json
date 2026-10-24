@@ -1,0 +1,845 @@
+{
+ "id": "station",
+ "version": 1,
+ "name": {
+  "en": "Space Station",
+  "zh-TW": "太空站",
+  "zh-CN": "空间站",
+  "ja": "宇宙ステーション",
+  "ko": "우주 정거장",
+  "es": "Estación espacial",
+  "fr": "Station spatiale",
+  "de": "Raumstation",
+  "pt": "Estação espacial"
+ },
+ "credits": "Models: Kenney Space Station Kit, Space Kit (CC0)",
+ "W": 16,
+ "D": 12,
+ "viewH": 2.8,
+ "background": "#060915",
+ "fixedSky": true,
+ "sky": "#060915",
+ "spawn": {
+  "x": 0.45,
+  "y": 6.25
+ },
+ "walk": [
+  [
+   0.25,
+   0.25,
+   15.75,
+   11.75
+  ]
+ ],
+ "solid": [
+  [
+   1.2,
+   0.2,
+   1.5,
+   0.65
+  ],
+  [
+   2.95,
+   0.2,
+   1.5,
+   0.65
+  ],
+  [
+   4.7,
+   0.2,
+   1.5,
+   0.65
+  ],
+  [
+   6.45,
+   0.2,
+   1.5,
+   0.65
+  ],
+  [
+   8.2,
+   0.2,
+   1.5,
+   0.65
+  ],
+  [
+   11.6,
+   1.5,
+   2.8,
+   1.0
+  ],
+  [
+   6.95,
+   5.95,
+   1.4,
+   1.4
+  ],
+  [
+   13.3,
+   5.3,
+   2.2,
+   1.8
+  ],
+  [
+   12.0,
+   7.6,
+   0.9,
+   0.9
+  ],
+  [
+   15.0,
+   7.8,
+   0.7,
+   0.7
+  ],
+  [
+   0.3,
+   7.6,
+   1.0,
+   2.0
+  ],
+  [
+   0.3,
+   9.9,
+   1.0,
+   2.0
+  ],
+  [
+   2.6,
+   8.6,
+   1.2,
+   1.0
+  ],
+  [
+   4.6,
+   11.0,
+   0.8,
+   0.7
+  ],
+  [
+   1.6,
+   5.0,
+   0.6,
+   0.5
+  ],
+  [
+   12.3,
+   10.3,
+   1.8,
+   1.3
+  ]
+ ],
+ "props": [
+  {
+   "special": "stars",
+   "count": 1100,
+   "r": 75,
+   "size": 0.32
+  },
+  {
+   "special": "planet",
+   "x": -4.0,
+   "y": -12.0,
+   "z": -10.0,
+   "r": 5.0,
+   "colors": [
+    "#e08a5a",
+    "#c76b45",
+    "#f0b27a",
+    "#a85a3c"
+   ]
+  },
+  {
+   "special": "planet",
+   "x": 9.5,
+   "y": -14.0,
+   "z": -8.0,
+   "r": 1.6,
+   "colors": [
+    "#9fb3c8",
+    "#7d93ab",
+    "#c3d2e0"
+   ]
+  },
+  {
+   "special": "floor",
+   "x": 0,
+   "y": 0,
+   "w": 16,
+   "d": 12,
+   "pattern": "checker",
+   "color": "#3a4250",
+   "color2": "#333a46",
+   "tile": 1
+  },
+  {
+   "special": "wall",
+   "axis": "x",
+   "x": 0,
+   "y": 0,
+   "len": 16,
+   "h": 2.6,
+   "color": "#c7d1dd",
+   "frame": "#5b6676",
+   "clear": true,
+   "holes": [
+    [
+     0.8,
+     10.2,
+     0.85,
+     2.35
+    ]
+   ]
+  },
+  {
+   "special": "wall",
+   "axis": "z",
+   "x": 0,
+   "y": 0,
+   "len": 12,
+   "h": 2.6,
+   "color": "#b7c2cf",
+   "frame": "#5b6676",
+   "clear": true,
+   "holes": [
+    [
+     1.0,
+     3.8,
+     0.85,
+     2.35
+    ],
+    [
+     5.6,
+     1.3,
+     0,
+     2.1
+    ]
+   ],
+   "door": "#7f8a99"
+  },
+  {
+   "special": "sign",
+   "x": 13.0,
+   "y": 0,
+   "z": 2.25,
+   "w": 2.6,
+   "h": 0.42,
+   "bg": "#101622",
+   "fg": "#5ad1ff",
+   "glow": true,
+   "text": "ORBITAL STATION 7"
+  },
+  {
+   "special": "sign",
+   "x": 0,
+   "y": 6.25,
+   "z": 2.3,
+   "w": 1.3,
+   "h": 0.3,
+   "face": "+x",
+   "bg": "#101622",
+   "fg": "#ffcf5a",
+   "glow": true,
+   "text": "AIRLOCK"
+  },
+  {
+   "special": "glow",
+   "x": 1.0,
+   "y": 1.05,
+   "w": 9.2,
+   "d": 0.05,
+   "h": 0.02,
+   "y0": 0.003,
+   "color": "#5ad1ff"
+  },
+  {
+   "special": "glow",
+   "x": 0.3,
+   "y": 4.95,
+   "w": 15.4,
+   "d": 0.06,
+   "h": 0.02,
+   "y0": 0.003,
+   "color": "#5ad1ff",
+   "intensity": 0.8
+  },
+  {
+   "special": "glow",
+   "x": 6.0,
+   "y": 8.6,
+   "w": 5.0,
+   "d": 0.05,
+   "h": 0.02,
+   "y0": 0.003,
+   "color": "#8b6bff",
+   "intensity": 1.4,
+   "pulse": true
+  },
+  {
+   "special": "glow",
+   "x": 6.0,
+   "y": 11.55,
+   "w": 5.0,
+   "d": 0.05,
+   "h": 0.02,
+   "y0": 0.003,
+   "color": "#8b6bff",
+   "intensity": 1.4,
+   "pulse": true
+  },
+  {
+   "special": "glow",
+   "x": 6.0,
+   "y": 8.6,
+   "w": 0.05,
+   "d": 3.0,
+   "h": 0.02,
+   "y0": 0.003,
+   "color": "#8b6bff",
+   "intensity": 1.4,
+   "pulse": true
+  },
+  {
+   "special": "glow",
+   "x": 10.95,
+   "y": 8.6,
+   "w": 0.05,
+   "d": 3.0,
+   "h": 0.02,
+   "y0": 0.003,
+   "color": "#8b6bff",
+   "intensity": 1.4,
+   "pulse": true
+  },
+  {
+   "special": "lamp",
+   "x": 4.0,
+   "y": 3.0,
+   "z": 2.3,
+   "color": "#bfe4ff",
+   "intensity": 1.1,
+   "range": 6
+  },
+  {
+   "special": "lamp",
+   "x": 11.0,
+   "y": 3.5,
+   "z": 2.3,
+   "color": "#bfe4ff",
+   "intensity": 1.1,
+   "range": 6
+  },
+  {
+   "special": "lamp",
+   "x": 8.5,
+   "y": 9.5,
+   "z": 2.3,
+   "color": "#bfe4ff",
+   "intensity": 1.1,
+   "range": 6
+  },
+  {
+   "special": "lamp",
+   "x": 3.0,
+   "y": 9.5,
+   "z": 2.3,
+   "color": "#bfe4ff",
+   "intensity": 1.1,
+   "range": 6
+  },
+  {
+   "special": "lamp",
+   "x": 13.5,
+   "y": 8.5,
+   "z": 2.3,
+   "color": "#bfe4ff",
+   "intensity": 1.1,
+   "range": 6
+  },
+  {
+   "m": "computer-wide",
+   "x": 1.2,
+   "y": 0.2,
+   "w": 1.5,
+   "d": 0.65,
+   "h": 1.0
+  },
+  {
+   "m": "chair-headrest",
+   "x": 1.65,
+   "y": 1.2,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 1.0,
+   "rot": 180
+  },
+  {
+   "m": "computer-wide",
+   "x": 2.95,
+   "y": 0.2,
+   "w": 1.5,
+   "d": 0.65,
+   "h": 1.0
+  },
+  {
+   "m": "chair-headrest",
+   "x": 3.4000000000000004,
+   "y": 1.2,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 1.0,
+   "rot": 180
+  },
+  {
+   "m": "computer-wide",
+   "x": 4.7,
+   "y": 0.2,
+   "w": 1.5,
+   "d": 0.65,
+   "h": 1.0
+  },
+  {
+   "m": "chair-headrest",
+   "x": 5.15,
+   "y": 1.2,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 1.0,
+   "rot": 180
+  },
+  {
+   "m": "computer-wide",
+   "x": 6.45,
+   "y": 0.2,
+   "w": 1.5,
+   "d": 0.65,
+   "h": 1.0
+  },
+  {
+   "m": "chair-headrest",
+   "x": 6.9,
+   "y": 1.2,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 1.0,
+   "rot": 180
+  },
+  {
+   "m": "computer-wide",
+   "x": 8.2,
+   "y": 0.2,
+   "w": 1.5,
+   "d": 0.65,
+   "h": 1.0
+  },
+  {
+   "m": "chair-headrest",
+   "x": 8.649999999999999,
+   "y": 1.2,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 1.0,
+   "rot": 180
+  },
+  {
+   "m": "display-wall-wide",
+   "x": 11.4,
+   "y": 0.06,
+   "w": 3.2,
+   "d": 0.25,
+   "h": 1.3,
+   "y0": 0.8
+  },
+  {
+   "m": "table-large",
+   "x": 11.6,
+   "y": 1.5,
+   "w": 2.8,
+   "d": 1.0,
+   "h": 0.9,
+   "stretch": true
+  },
+  {
+   "m": "computer-system",
+   "x": 11.8,
+   "y": 1.6,
+   "w": 0.9,
+   "d": 0.6,
+   "h": 0.6,
+   "y0": 0.9
+  },
+  {
+   "m": "table-display-small",
+   "x": 13.3,
+   "y": 1.65,
+   "w": 0.7,
+   "d": 0.6,
+   "h": 0.5,
+   "y0": 0.9
+  },
+  {
+   "m": "table-display-planet",
+   "x": 6.9,
+   "y": 5.9,
+   "w": 1.5,
+   "d": 1.5,
+   "h": 1.15
+  },
+  {
+   "m": "machine_generatorLarge",
+   "x": 13.3,
+   "y": 5.3,
+   "w": 2.2,
+   "d": 1.8,
+   "h": 1.6
+  },
+  {
+   "m": "machine_barrelLarge",
+   "x": 12.0,
+   "y": 7.6,
+   "w": 0.9,
+   "d": 0.9,
+   "h": 1.2
+  },
+  {
+   "m": "machine_wireless",
+   "x": 15.0,
+   "y": 7.8,
+   "w": 0.7,
+   "d": 0.7,
+   "h": 1.0
+  },
+  {
+   "m": "pipe",
+   "x": 15.55,
+   "y": 3.6,
+   "w": 0.3,
+   "d": 1.6,
+   "h": 2.4,
+   "stretch": true
+  },
+  {
+   "m": "pipe-ring-colored",
+   "x": 15.5,
+   "y": 4.2,
+   "w": 0.4,
+   "d": 0.4,
+   "h": 0.5,
+   "y0": 1.2
+  },
+  {
+   "special": "glow",
+   "x": 13.3,
+   "y": 7.2,
+   "w": 2.2,
+   "d": 0.05,
+   "h": 0.02,
+   "y0": 0.003,
+   "color": "#ffa24a",
+   "pulse": true
+  },
+  {
+   "m": "bed-single-cover",
+   "x": 0.3,
+   "y": 7.6,
+   "w": 1.0,
+   "d": 2.0,
+   "h": 0.6,
+   "stretch": true
+  },
+  {
+   "m": "bed-single-cover",
+   "x": 0.3,
+   "y": 9.9,
+   "w": 1.0,
+   "d": 2.0,
+   "h": 0.6,
+   "stretch": true
+  },
+  {
+   "m": "table",
+   "x": 2.6,
+   "y": 8.6,
+   "w": 1.2,
+   "d": 1.0,
+   "h": 0.8,
+   "stretch": true
+  },
+  {
+   "m": "chair-armrest-headrest",
+   "x": 1.9000000000000001,
+   "y": 8.8,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 0.95,
+   "rot": 90
+  },
+  {
+   "m": "chair-armrest-headrest",
+   "x": 3.9000000000000004,
+   "y": 8.8,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 0.95,
+   "rot": -90
+  },
+  {
+   "m": "container-tall",
+   "x": 4.6,
+   "y": 11.0,
+   "w": 0.8,
+   "d": 0.7,
+   "h": 1.6
+  },
+  {
+   "special": "glow",
+   "x": 4.75,
+   "y": 11.0,
+   "w": 0.5,
+   "d": 0.02,
+   "h": 0.6,
+   "y0": 0.8,
+   "color": "#5af0a0",
+   "intensity": 0.9
+  },
+  {
+   "m": "astronautA",
+   "x": 1.6,
+   "y": 5.0,
+   "w": 0.6,
+   "d": 0.5,
+   "h": 1.0
+  },
+  {
+   "m": "rover",
+   "x": 12.2,
+   "y": 10.2,
+   "w": 2.0,
+   "d": 1.5,
+   "h": 0.95,
+   "rot": -30
+  },
+  {
+   "m": "alien",
+   "x": 15.0,
+   "y": 10.6,
+   "w": 0.55,
+   "d": 0.5,
+   "h": 0.75,
+   "rot": 200
+  },
+  {
+   "m": "container-wide",
+   "x": 14.9,
+   "y": 11.0,
+   "w": 0.9,
+   "d": 0.8,
+   "h": 0.6
+  },
+  {
+   "m": "barrels",
+   "x": 11.2,
+   "y": 11.0,
+   "w": 0.8,
+   "d": 0.8,
+   "h": 0.7
+  },
+  {
+   "m": "rock_crystals",
+   "x": 9.0,
+   "y": 0.35,
+   "w": 0.6,
+   "d": 0.5,
+   "h": 0.4,
+   "y0": 1.0
+  },
+  {
+   "m": "satelliteDish_detailed",
+   "x": 10.6,
+   "y": 0.3,
+   "w": 0.6,
+   "d": 0.6,
+   "h": 0.6,
+   "y0": 0.0
+  }
+ ],
+ "stations": [
+  {
+   "x": 1.95,
+   "y": 1.5,
+   "yaw": 180,
+   "pose": "sit"
+  },
+  {
+   "x": 3.7,
+   "y": 1.5,
+   "yaw": 180,
+   "pose": "sit"
+  },
+  {
+   "x": 5.45,
+   "y": 1.5,
+   "yaw": 180,
+   "pose": "sit"
+  },
+  {
+   "x": 7.2,
+   "y": 1.5,
+   "yaw": 180,
+   "pose": "sit"
+  },
+  {
+   "x": 8.95,
+   "y": 1.5,
+   "yaw": 180,
+   "pose": "sit"
+  },
+  {
+   "x": 12.3,
+   "y": 3.0,
+   "yaw": 180,
+   "anim": "interact-right"
+  },
+  {
+   "x": 13.7,
+   "y": 3.0,
+   "yaw": 180,
+   "anim": "interact-left"
+  },
+  {
+   "x": 15.0,
+   "y": 2.0,
+   "yaw": -90,
+   "anim": "interact-right"
+  },
+  {
+   "x": 12.7,
+   "y": 6.2,
+   "yaw": 90,
+   "anim": "interact-right"
+  },
+  {
+   "x": 14.4,
+   "y": 7.6,
+   "yaw": 180,
+   "anim": "pick-up"
+  }
+ ],
+ "pois": [
+  {
+   "x": 7.65,
+   "y": 5.3,
+   "act": "holo",
+   "yaw": 0,
+   "anim": "interact-right",
+   "emoji": "🪐"
+  },
+  {
+   "x": 7.65,
+   "y": 7.95,
+   "act": "holo",
+   "yaw": 180,
+   "anim": "interact-left",
+   "emoji": "🌍"
+  },
+  {
+   "x": 6.3,
+   "y": 6.65,
+   "act": "holo",
+   "yaw": 90,
+   "anim": "interact-right",
+   "emoji": "☄️"
+  },
+  {
+   "x": 0.8,
+   "y": 8.6,
+   "act": "bunk",
+   "yaw": 90,
+   "sit": true,
+   "emoji": "😴",
+   "sleepy": true
+  },
+  {
+   "x": 0.8,
+   "y": 10.9,
+   "act": "bunk",
+   "yaw": 90,
+   "sit": true,
+   "emoji": "😴",
+   "sleepy": true
+  },
+  {
+   "x": 2.2,
+   "y": 9.1,
+   "act": "meal",
+   "yaw": 90,
+   "sit": true,
+   "emoji": "🍜",
+   "prop": "cup"
+  },
+  {
+   "x": 4.2,
+   "y": 9.1,
+   "act": "meal",
+   "yaw": -90,
+   "sit": true,
+   "emoji": "🍜",
+   "prop": "cup"
+  },
+  {
+   "x": 5.0,
+   "y": 10.4,
+   "act": "drink",
+   "yaw": 180,
+   "anim": "holding-right",
+   "prop": "cup",
+   "emoji": "🧃"
+  },
+  {
+   "x": 7.0,
+   "y": 9.6,
+   "act": "float",
+   "float": true,
+   "anim": "fall",
+   "emoji": "🌌"
+  },
+  {
+   "x": 8.7,
+   "y": 10.5,
+   "act": "float",
+   "float": true,
+   "anim": "fall",
+   "emoji": "🛸"
+  },
+  {
+   "x": 10.2,
+   "y": 9.3,
+   "act": "float",
+   "float": true,
+   "anim": "fall",
+   "emoji": "✨"
+  },
+  {
+   "x": 0.9,
+   "y": 2.3,
+   "act": "window",
+   "yaw": -90,
+   "emoji": "🌍"
+  },
+  {
+   "x": 0.9,
+   "y": 4.0,
+   "act": "window",
+   "yaw": -90,
+   "emoji": "🔭"
+  },
+  {
+   "x": 14.9,
+   "y": 9.9,
+   "act": "alien",
+   "yaw": 0,
+   "anim": "emote-yes",
+   "emoji": "👽"
+  }
+ ]
+}
