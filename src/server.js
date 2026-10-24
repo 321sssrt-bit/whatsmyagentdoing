@@ -12,9 +12,10 @@ const STATIC = {
   '/office3d.js': ['office3d.js', 'text/javascript; charset=utf-8'],
   '/i18n.js': ['i18n.js', 'text/javascript; charset=utf-8'],
 };
-const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png' };
+const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png', '.json': 'application/json' };
 // 3D models, served as-is (3D view only).
 const MOUNTS = { '/assets/': path.join(__dirname, '..', 'assets') };
+const scenes = require('./scenes');
 
 function serveFile(res, root, rel) {
   const file = path.normalize(path.join(root, rel));
@@ -118,6 +119,28 @@ function createServer(watcher, opts, { onShutdown } = {}) {
     } else if (Object.keys(MOUNTS).some((m) => url.pathname.startsWith(m))) {
       const m = Object.keys(MOUNTS).find((k) => url.pathname.startsWith(k));
       serveFile(res, MOUNTS[m], decodeURIComponent(url.pathname.slice(m.length)));
+    } else if (url.pathname.startsWith('/scenes/')) {
+      const rel = decodeURIComponent(url.pathname.slice('/scenes/'.length));
+      const [id, ...rest] = rel.split('/');
+      const dir = scenes.sceneDir(id);
+      if (!dir) res.writeHead(404).end();
+      else serveFile(res, dir, rest.join('/'));
+    } else if (url.pathname === '/api/scenes') {
+      const have = scenes.installed();
+      const ids = new Set(have.map((x) => x.id));
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({
+        installed: have.map(({ id, name, version, credits }) => ({ id, name, version, credits })),
+        available: scenes.catalog().filter((x) => !ids.has(x.id)).map(({ id, name, version, size, credits }) => ({ id, name, version, size, credits })),
+      }));
+    } else if (url.pathname === '/api/scenes/install' && req.method === 'POST') {
+      // Same guard as shutdown: a custom header web pages can't send cross-site.
+      if (req.headers['x-whatsmyagentdoing'] !== 'install') { res.writeHead(403).end(); return; }
+      const id = url.searchParams.get('id') || '';
+      scenes.install(id).then(
+        (x) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, id: x.id })); },
+        (e) => { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: String(e.message || e) })); },
+      );
     } else if (url.pathname === '/api/sessions') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(snapshot(watcher, opts)));

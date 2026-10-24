@@ -5,6 +5,7 @@ const http = require('http');
 const { spawn } = require('child_process');
 const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR } = require('../src/watcher');
 const { DemoWatcher } = require('../src/demo');
+const scenes = require('../src/scenes');
 const { createServer, snapshot } = require('../src/server');
 const pkg = require('../package.json');
 
@@ -21,6 +22,9 @@ Options:
   --json            Print one snapshot as JSON and exit
   --demo            Show a made-up team instead of your sessions
   --stop            Stop a running dashboard
+  --scenes          List 3D scenes (installed and downloadable)
+  --scene <id>      Download a scene if needed and open the office in it
+  --remove-scene <id>  Delete a downloaded scene
   -h, --help        Show this help
 
 Reads (never writes):
@@ -30,7 +34,7 @@ Reads (never writes):
 Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
 
 function parseArgs(argv) {
-  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false };
+  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') { console.log(HELP); process.exit(0); }
@@ -44,6 +48,10 @@ function parseArgs(argv) {
     else if (a === '--json') o.json = true;
     else if (a === '--demo') o.demo = true;
     else if (a === '--stop') o.stop = true;
+    else if (a === '--scenes') o.scenes = true;
+    else if (a === '--scene') o.scene = argv[++i];
+    else if (a.startsWith('--scene=')) o.scene = a.slice(8);
+    else if (a === '--remove-scene') o.removeScene = argv[++i];
     else { console.error(`Unknown option: ${a}\n\n${HELP}`); process.exit(1); }
   }
   if (!Number.isFinite(o.port) || !Number.isFinite(o.hours)) { console.error(HELP); process.exit(1); }
@@ -85,6 +93,34 @@ function stopAt(port) {
 async function main() {
   const o = parseArgs(process.argv.slice(2));
 
+  if (o.scenes) {
+    const have = scenes.installed();
+    const name = (x) => (x.name && (x.name.en || Object.values(x.name)[0])) || x.id;
+    console.log('3D scenes (pick one with --scene <id>, or from the scene menu in High 3D):');
+    console.log('  office      Office (built in)');
+    for (const x of have) console.log(`  ${x.id.padEnd(11)} ${name(x)} (installed)`);
+    for (const x of scenes.catalog().filter((c) => !have.some((h) => h.id === c.id))) {
+      console.log(`  ${x.id.padEnd(11)} ${name(x)} (download, ${Math.max(1, Math.round(x.size / 1024))} KB)`);
+    }
+    return;
+  }
+
+  if (o.removeScene) {
+    console.log(scenes.remove(o.removeScene) ? `Removed ${o.removeScene}.` : `${o.removeScene} isn't a downloaded scene.`);
+    return;
+  }
+
+  if (o.scene && o.scene !== 'office') {
+    try {
+      const had = scenes.sceneDir(o.scene);
+      const x = await scenes.install(o.scene);
+      console.log(had ? `Scene ${x.id} is ready.` : `Downloaded scene ${x.id}.`);
+    } catch (e) {
+      console.error(String(e.message || e));
+      process.exit(1);
+    }
+  }
+
   if (o.stop) {
     // It may have moved to a later port if the default was taken.
     const ports = [];
@@ -103,8 +139,9 @@ async function main() {
     return;
   }
 
+  const query = o.scene ? `/?view=office&quality=high&scene=${encodeURIComponent(o.scene)}` : '';
   if (await alreadyRunning(o.port)) {
-    const url = `http://localhost:${o.port}`;
+    const url = `http://localhost:${o.port}${query}`;
     console.log(`Already running at ${url}`);
     if (o.open) openBrowser(url);
     return;
@@ -123,9 +160,10 @@ async function main() {
     server.listen(port, '127.0.0.1', () => {
       const url = `http://localhost:${port}`;
       const n = watcher.sessions().length;
+      const openUrl = url + query;
       const what = o.demo ? 'demo team' : `${n} session${n === 1 ? '' : 's'} in the last ${o.hours}h`;
       console.log(`whatsmyagentdoing → ${url}  (${what}, Ctrl+C to stop)`);
-      if (o.open) openBrowser(url);
+      if (o.open) openBrowser(openUrl);
     });
   };
   listen(o.port, 10);

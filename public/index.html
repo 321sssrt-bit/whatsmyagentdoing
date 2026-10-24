@@ -62,6 +62,7 @@
   .seg button { border: 0; background: none; color: var(--muted); padding: 5px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--line); }
   .seg button.on { background: var(--ink); color: var(--bg); }
+  .seg button small { opacity: .65; font-size: 11px; }
   label.tog { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); cursor: pointer; user-select: none; }
   .btn { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 5px 11px; border-radius: 8px; font: inherit; font-size: 12.5px; cursor: pointer; }
   .btn:hover { color: var(--ink); }
@@ -160,6 +161,7 @@
         <button data-v="mid" data-t="qMid"></button>
         <button data-v="high" data-t="qHigh"></button>
       </div>
+      <div class="seg" id="sceneSeg" role="group" aria-label="Scene"></div>
       <div class="seg" id="agentSeg">
         <button data-v="all" class="on" data-t="all"></button>
         <button data-v="claude">Claude</button>
@@ -209,6 +211,7 @@ function applyLang(code) {
   if (sel) sel.options[0].textContent = `🌐 ${L.auto}`;
   if (typeof office !== 'undefined' && office) office.offDutyLabel = L.wentHome;
   if (typeof syncControls === 'function') syncControls();
+  if (typeof renderSceneSel === 'function') renderSceneSel();
 }
 
 const store = (() => {
@@ -217,9 +220,18 @@ const store = (() => {
   return { get, set };
 })();
 
+// ?view=office&quality=high&scene=pirate (what `--scene` opens) sets the prefs.
+{
+  const q = new URLSearchParams(location.search);
+  for (const k of ['view', 'quality', 'scene', 'lang']) if (q.get(k)) store.set(k, q.get(k));
+  if (location.search) history.replaceState(null, '', location.pathname);
+}
+
 const state = {
   view: store.get('view', 'office'),
   quality: store.get('quality', 'mid'),
+  scene: store.get('scene', 'office'),
+  scenes: [],
   agent: store.get('agent', 'all'),
   showSub: store.get('showSub', false),
   showIdle: store.get('showIdle', false),
@@ -408,6 +420,8 @@ function syncControls() {
   document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.view));
   document.querySelectorAll('#qualSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.quality));
   document.getElementById('qualSeg').style.display = state.view === 'office' ? '' : 'none';
+  const ss = document.getElementById('sceneSeg');
+  if (ss) ss.style.display = state.view === 'office' && state.quality === 'high' ? '' : 'none';
   showSub.checked = state.showSub;
   showIdle.checked = state.showIdle;
   if (!window.Notification) notifyBtn.style.display = 'none';
@@ -465,19 +479,28 @@ function setLoading(on, text) {
   if (text) document.getElementById('loaderText').textContent = text;
 }
 async function makeOffice() {
-  const kind = state.quality === 'high' ? 'high' : 'mid';
+  const high = state.quality === 'high';
+  const scene = high && state.scene !== 'office' && state.scenes.some((x) => x.id === state.scene) ? state.scene : 'office';
+  const kind = high ? `high:${scene}` : 'mid';
   if (kind === officeKind) return;
   officeKind = kind;
-  setLoading(true, kind === 'high' ? L.loading3d : L.loading2d);
+  setLoading(true, high ? L.loading3d : L.loading2d);
   let Cls = window.Office;
-  if (kind === 'high') {
-    try { Cls = (await import('/office3d.js')).Office3D; } catch (e) { console.error(e); Cls = window.Office; }
+  const opts = { ...officeOpts };
+  if (high) {
+    try {
+      Cls = (await import('/office3d.js')).Office3D;
+      if (scene !== 'office') {
+        const m = await fetch(`/scenes/${scene}/manifest.json`).then((r) => r.json());
+        opts.scene = { ...m, base: `/scenes/${scene}/` };
+      }
+    } catch (e) { console.error(e); Cls = window.Office; }
     if (officeKind !== kind) return;
   }
   if (office) office.destroy();
   let mine;
   try {
-    mine = new Cls(officeEl, officeOpts);
+    mine = new Cls(officeEl, opts);
   } catch (e) {
     console.error(e);
     mine = new window.Office(officeEl, officeOpts);
@@ -499,6 +522,48 @@ async function makeOffice() {
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 
+// Scenes (3D only): the built-in office plus any installed scene packs.
+const sceneSel = document.getElementById('sceneSeg');
+state.available = [];
+function renderSceneSel() {
+  const name = (x) => (x.name && (x.name[langCode] || x.name.en)) || x.id;
+  const kb = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const current = state.scenes.some((x) => x.id === state.scene) ? state.scene : 'office';
+  const btn = (v, label, title = '') =>
+    `<button data-v="${esc(v)}" class="${v === current ? 'on' : ''}"${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
+  sceneSel.innerHTML = btn('office', `🏢 ${esc(L.office)}`) +
+    state.scenes.map((x) => btn(x.id, `🏝 ${esc(name(x))}`, x.credits || '')).join('') +
+    state.available.map((x) => btn(`dl:${x.id}`, `⬇ ${esc(name(x))} <small>${kb(x.size)}</small>`, `${L.dl} ${kb(x.size)}`)).join('');
+}
+function loadScenes() {
+  return fetch('/api/scenes').then((r) => r.json()).then((d) => {
+    state.scenes = d.installed || [];
+    state.available = d.available || [];
+    renderSceneSel();
+  }).catch(() => {});
+}
+sceneSel.addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b || b.classList.contains('on') || sceneSel.dataset.busy) return;
+  let id = b.dataset.v;
+  hideTip();
+  if (id.startsWith('dl:')) {
+    // A scene pack: download it (the server checks its checksum), then switch.
+    id = id.slice(3);
+    sceneSel.dataset.busy = '1';
+    setLoading(true, L.installing);
+    const r = await fetch(`/api/scenes/install?id=${encodeURIComponent(id)}`, { method: 'POST', headers: { 'x-whatsmyagentdoing': 'install' } })
+      .then((x) => x.json()).catch(() => ({ ok: false }));
+    await loadScenes();
+    delete sceneSel.dataset.busy;
+    if (!r.ok) { setLoading(true, L.installFailed); setTimeout(() => setLoading(false), 2000); renderSceneSel(); return; }
+  }
+  state.scene = id; store.set('scene', id); renderSceneSel(); makeOffice();
+});
+// Know the installed scenes before building the first office, so a saved
+// scene choice doesn't build the default office first and then swap.
+const scenesReady = loadScenes();
+
 const langSel = document.getElementById('langSel');
 langSel.innerHTML = '<option value="auto"></option>' +
   Object.entries(I18N).map(([k, v]) => `<option value="${k}">${v.langName}</option>`).join('');
@@ -510,7 +575,7 @@ langSel.addEventListener('change', () => {
 });
 applyLang(chooseLang(null));
 syncControls();
-makeOffice();
+scenesReady.then(() => makeOffice());
 connect();
 setInterval(tickTimes, 1000);
 </script>

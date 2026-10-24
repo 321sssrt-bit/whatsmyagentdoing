@@ -459,7 +459,8 @@
       this.offDuty = off.length - wanderers.length;
 
       const cap = this.plan.desks.length;
-      if (working.length > cap - 1 || (cap > 8 && working.length < cap * 0.35)) {
+      // Scene packs have a fixed floor plan; the built-in office grows with the team.
+      if (!this.plan.fixed && (working.length > cap - 1 || (cap > 8 && working.length < cap * 0.35))) {
         this.plan = this.buildPlan(working.length);
         this.deskOf.clear();
         for (const p of this.people.values()) { p.poi = null; p.napDesk = null; p.desk = null; p.until = 0; }
@@ -553,10 +554,10 @@
         if (q.taken) continue;
         let w = 1;
         if (q.pair) w = plan.pois.some((o) => o.pair === q.pair && o !== q && o.taken) ? 7 : 1.2;
-        if (q.act === 'couch' || q.act === 'beanbag') w = sleepy ? 3 : 1.4;
+        if (q.act === 'couch' || q.act === 'beanbag' || q.sleepy) w = sleepy ? 3 : 1.4;
         weighted.push([q, w]);
       }
-      for (const d of plan.desks) {
+      for (const d of plan.noNap ? [] : plan.desks) {
         if (workingDesks.has(d) || d.napper) continue;
         weighted.push([{ x: d.seat.x, y: d.seat.y, act: 'nap', face: d.side === 'n' ? 'front' : 'back', sit: 0.34, desk: d }, sleepy ? 3 : 0.25]);
       }
@@ -1119,6 +1120,7 @@
       if (p.mode === 'work' && p.desk) {
         const face = p.desk.side === 'n' ? 'front' : 'back';
         if (s.status === 'waiting' || s.status === 'error') return { pose: 'stand', face, act: 'wave', sitZ: 0 };
+        if (p.desk.pose === 'stand') return { pose: 'stand', face, act: 'station', sitZ: 0 };
         return { pose: 'sit', face, act: s.status === 'tool' || s.status === 'typing' ? 'type' : 'think', sitZ: 0.34 };
       }
       if (p.mode === 'wander' && p.poi) {
@@ -1343,7 +1345,7 @@
         }
       } else if (p.mode === 'wander') {
         const justDone = st === 'done' && Date.now() - (s.lastEventAt || 0) < 3 * 60_000;
-        const dozing = at.act === 'nap' || (st === 'idle' && (at.act === 'couch' || at.act === 'beanbag'));
+        const dozing = at.act === 'nap' || (st === 'idle' && (at.act === 'couch' || at.act === 'beanbag' || (p.poi && p.poi.sleepy)));
         if (justDone) {
           c.fillStyle = STATUS_COLOR.done;
           c.beginPath(); c.arc(x, y - 10, 7, 0, Math.PI * 2); c.fill();
@@ -1360,12 +1362,12 @@
           c.globalAlpha = 1;
           c.font = font(600, 10);
           top = y - 20;
-        } else if (at.act && ACT_EMOJI[at.act] && !p.path.length) {
+        } else if (at.act && (ACT_EMOJI[at.act] || (p.poi && p.poi.emoji)) && !p.path.length) {
           const cycle = (t + p.phase * 3) % 9;
           if (cycle < 2.2) {
             c.globalAlpha = Math.min(1, cycle * 3, (2.2 - cycle) * 3);
             c.font = font(400, 13);
-            c.fillText(ACT_EMOJI[at.act], x, y - 10);
+            c.fillText((p.poi && p.poi.emoji) || ACT_EMOJI[at.act], x, y - 10);
             c.globalAlpha = 1;
             c.font = font(600, 10);
             top = y - 18;
@@ -1531,4 +1533,5 @@
   }
 
   window.Office = Office;
+  window.OfficeGrid = Grid;
 })();
