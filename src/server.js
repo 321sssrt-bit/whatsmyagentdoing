@@ -24,7 +24,8 @@ function serveFile(res, root, rel) {
     res.writeHead(404).end();
     return;
   }
-  res.writeHead(200, { 'content-type': type, 'cache-control': 'max-age=3600' });
+  // no-cache: a reinstalled scene pack or an updated clone must show up on reload
+  res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' });
   fs.createReadStream(file).pipe(res);
 }
 const ACTIVE = new Set(['thinking', 'tool', 'typing']);
