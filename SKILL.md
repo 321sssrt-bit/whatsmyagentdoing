@@ -15,6 +15,11 @@ node "<base directory>/bin/cli.js"
 
 If it is already running, the same command just reopens the browser tab.
 
+To **update** it — `/myoffice update`, or the user asks to update / upgrade —
+run `node "<base directory>/bin/cli.js" --update` (not in the background),
+report the version it printed, then start it again as above. The page also
+shows the version in the corner and an "Update" button when a new one is out.
+
 To **close** it — `/myoffice stop`, or the user asks to stop / close / shut the
 office down — run (not in the background):
 

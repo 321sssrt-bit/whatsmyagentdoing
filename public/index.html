@@ -141,6 +141,10 @@
   .tip .card { box-shadow: 0 8px 30px rgba(0,0,0,.18); }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; color: var(--muted); font-size: 12px; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .ver { position: fixed; right: 14px; bottom: 12px; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--faint); z-index: 5; }
+  .ver button { border: 1px solid var(--tool); background: color-mix(in srgb, var(--tool) 14%, var(--panel)); color: var(--ink); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+  .ver button:disabled { opacity: .6; cursor: default; }
+  .ver code { background: var(--panel); border: 1px solid var(--line); padding: 2px 6px; border-radius: 6px; }
   .empty { text-align: center; color: var(--muted); padding: 60px 16px; border: 1px dashed var(--line); border-radius: 12px; }
   .empty code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
   .conn { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--error); color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; display: none; }
@@ -182,6 +186,7 @@
 </div>
 <div class="conn" id="conn" data-t="disconnected"></div>
 <div class="tip" id="tip"></div>
+<div class="ver" id="ver"></div>
 <script src="/i18n.js"></script>
 <script src="/office.js"></script>
 
@@ -212,6 +217,7 @@ function applyLang(code) {
   if (typeof office !== 'undefined' && office) office.offDutyLabel = L.wentHome;
   if (typeof syncControls === 'function') syncControls();
   if (typeof renderSceneSel === 'function') renderSceneSel();
+  if (typeof renderVersion === 'function') renderVersion();
 }
 
 const store = (() => {
@@ -563,6 +569,39 @@ sceneSel.addEventListener('click', async (e) => {
 // Know the installed scenes before building the first office, so a saved
 // scene choice doesn't build the default office first and then swap.
 const scenesReady = loadScenes();
+
+// ---- version + one-click update
+const verEl = document.getElementById('ver');
+let verInfo = null;
+function renderVersion() {
+  if (!verInfo) return;
+  let html = `<span>v${esc(verInfo.version)}</span>`;
+  if (verInfo.updateAvailable) {
+    html = verInfo.canUpdate
+      ? `<button id="updBtn">⬆ ${esc(L.update)} v${esc(verInfo.latest)}</button>` + html
+      : `<span>${esc(L.gitPull)} → v${esc(verInfo.latest)}</span>` + html;
+  }
+  verEl.innerHTML = html;
+  const b = document.getElementById('updBtn');
+  if (b) b.onclick = async () => {
+    b.disabled = true; b.textContent = L.updating;
+    const r = await fetch('/api/update', { method: 'POST', headers: { 'x-whatsmyagentdoing': 'update' } }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r.ok) { b.textContent = `${L.updateFailed}${r.error ? ': ' + r.error : ''}`; setTimeout(renderVersion, 4000); return; }
+    b.textContent = L.updated;
+    // the server restarts itself; reload once it answers again
+    const t0 = Date.now();
+    const wait = setInterval(() => {
+      fetch('/api/version', { cache: 'no-store' }).then((x) => x.json()).then((v) => {
+        if (v.version !== verInfo.version || Date.now() - t0 > 20000) { clearInterval(wait); location.reload(); }
+      }).catch(() => {});
+    }, 1000);
+  };
+}
+function loadVersion() {
+  fetch('/api/version', { cache: 'no-store' }).then((r) => r.json()).then((v) => { verInfo = v; renderVersion(); }).catch(() => {});
+}
+loadVersion();
+setInterval(loadVersion, 30 * 60 * 1000);
 
 const langSel = document.getElementById('langSel');
 langSel.innerHTML = '<option value="auto"></option>' +

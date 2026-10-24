@@ -63,11 +63,14 @@ Works with Claude Code (CLI, desktop, IDE), Codex (CLI, desktop, IDE) and Gemini
 --json            Print one snapshot as JSON and exit
 --demo            Show a made-up team instead of your sessions (screenshots, trying it out)
 --stop            Stop a running dashboard (or say /myoffice stop)
+--update          git pull the latest version and restart (or say /myoffice update)
 --scenes          List 3D scenes, installed and downloadable
 --scene <id>      Download a scene if needed and open the office in it
 ```
 
 Running it again while it's up just reopens the tab.
+
+**Updates:** the page shows its version in the corner and an **Update** button when a newer one is out (it checks the `package.json` on this repo's main branch every few hours; set `WMAD_NO_UPDATE_CHECK=1` to turn that off). The button — or `--update`, or `/myoffice update` — runs `git pull` in the install folder and restarts the dashboard.
 
 ## How it works
 

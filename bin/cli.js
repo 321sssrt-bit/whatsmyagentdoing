@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR } = require('../src/watcher');
 const { DemoWatcher } = require('../src/demo');
 const scenes = require('../src/scenes');
+const updater = require('../src/update');
 const { createServer, snapshot } = require('../src/server');
 const pkg = require('../package.json');
 
@@ -22,6 +23,7 @@ Options:
   --json            Print one snapshot as JSON and exit
   --demo            Show a made-up team instead of your sessions
   --stop            Stop a running dashboard
+  --update          Update to the latest version (git pull) and restart a running dashboard
   --scenes          List 3D scenes (installed and downloadable)
   --scene <id>      Download a scene if needed and open the office in it
   --remove-scene <id>  Delete a downloaded scene
@@ -34,7 +36,7 @@ Reads (never writes):
 Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
 
 function parseArgs(argv) {
-  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null };
+  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null, update: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') { console.log(HELP); process.exit(0); }
@@ -48,6 +50,7 @@ function parseArgs(argv) {
     else if (a === '--json') o.json = true;
     else if (a === '--demo') o.demo = true;
     else if (a === '--stop') o.stop = true;
+    else if (a === '--update') o.update = true;
     else if (a === '--scenes') o.scenes = true;
     else if (a === '--scene') o.scene = argv[++i];
     else if (a.startsWith('--scene=')) o.scene = a.slice(8);
@@ -92,6 +95,22 @@ function stopAt(port) {
 
 async function main() {
   const o = parseArgs(process.argv.slice(2));
+
+  if (o.update) {
+    const before = updater.localVersion();
+    try {
+      const after = await updater.update();
+      console.log(after === before ? `Already up to date (v${after}).` : `Updated v${before} → v${after}.`);
+      // a running dashboard keeps the old code until it restarts
+      for (let p = o.port; p <= o.port + 10; p++) {
+        if (await alreadyRunning(p)) { await stopAt(p); console.log(`Restart it with /myoffice (it was on port ${p}).`); }
+      }
+    } catch (e) {
+      console.error(String(e.message || e));
+      process.exit(1);
+    }
+    return;
+  }
 
   if (o.scenes) {
     const have = scenes.installed();
@@ -150,6 +169,16 @@ async function main() {
   const watcher = (o.demo ? new DemoWatcher() : new Watcher({ hours: o.hours })).start();
   const server = createServer(watcher, o, {
     onShutdown: () => { watcher.stop(); server.close(); process.exit(0); },
+    // after an update from the page: start the new code on the same port
+    onRestart: () => {
+      watcher.stop();
+      server.close(() => {
+        const args = process.argv.slice(2).filter((a) => a !== '--no-open' && !a.startsWith('--scene'));
+        spawn(process.execPath, [__filename, ...args, '--no-open'], { detached: true, stdio: 'ignore' }).unref();
+        process.exit(0);
+      });
+      server.closeAllConnections && server.closeAllConnections();
+    },
   });
 
   const listen = (port, tries) => {
@@ -162,7 +191,11 @@ async function main() {
       const n = watcher.sessions().length;
       const openUrl = url + query;
       const what = o.demo ? 'demo team' : `${n} session${n === 1 ? '' : 's'} in the last ${o.hours}h`;
-      console.log(`whatsmyagentdoing → ${url}  (${what}, Ctrl+C to stop)`);
+      console.log(`whatsmyagentdoing v${updater.localVersion()} → ${url}  (${what}, Ctrl+C to stop)`);
+      updater.checkLatest().then(() => {
+        const i = updater.info();
+        if (i.updateAvailable) console.log(`Update available: v${i.version} → v${i.latest}. Run with --update, or click "Update" on the page.`);
+      });
       if (o.open) openBrowser(openUrl);
     });
   };
