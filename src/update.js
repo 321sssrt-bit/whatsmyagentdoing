@@ -13,7 +13,7 @@ const { execFile } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const LATEST_URL = 'https://raw.githubusercontent.com/Charonyuu/whatsmyagentdoing/main/package.json';
-const CHECK_EVERY = 6 * 3600 * 1000;
+const CHECK_EVERY = 30 * 60 * 1000;
 
 function localVersion() {
   try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch { return '0.0.0'; }

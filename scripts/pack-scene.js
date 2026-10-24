@@ -60,6 +60,7 @@ let cat = { scenes: [] };
 try { cat = JSON.parse(fs.readFileSync(catalogPath, 'utf8')); } catch {}
 const entry = {
   id, version: manifest.version, name: manifest.name, credits: manifest.credits,
+  icon: manifest.icon || (cat.scenes.find((s) => s.id === id) || {}).icon,
   size: gz.length, sha256, url: `https://github.com/${REPO}/releases/download/scenes/${file}`,
 };
 cat.scenes = [...cat.scenes.filter((s) => s.id !== id), entry].sort((a, b) => a.id.localeCompare(b.id));

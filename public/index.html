@@ -538,8 +538,8 @@ function renderSceneSel() {
   const btn = (v, label, title = '') =>
     `<button data-v="${esc(v)}" class="${v === current ? 'on' : ''}"${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
   sceneSel.innerHTML = btn('office', `🏢 ${esc(L.office)}`) +
-    state.scenes.map((x) => btn(x.id, `🏝 ${esc(name(x))}`, x.credits || '')).join('') +
-    state.available.map((x) => btn(`dl:${x.id}`, `⬇ ${esc(name(x))} <small>${kb(x.size)}</small>`, `${L.dl} ${kb(x.size)}`)).join('');
+    state.scenes.map((x) => btn(x.id, `${esc(x.icon || '🗺️')} ${esc(name(x))}`, x.credits || '')).join('') +
+    state.available.map((x) => btn(`dl:${x.id}`, `⬇ ${esc(x.icon || '')} ${esc(name(x))} <small>${kb(x.size)}</small>`, `${L.dl} ${kb(x.size)}`)).join('');
 }
 function loadScenes() {
   return fetch('/api/scenes').then((r) => r.json()).then((d) => {

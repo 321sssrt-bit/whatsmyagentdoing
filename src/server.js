@@ -128,12 +128,14 @@ function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
       if (!dir) res.writeHead(404).end();
       else serveFile(res, dir, rest.join('/'));
     } else if (url.pathname === '/api/scenes') {
-      const have = scenes.installed();
+      const cat = scenes.catalog();
+      const icon = (x) => x.icon || (cat.find((c) => c.id === x.id) || {}).icon || '🗺️';
+      const have = scenes.installed().map((x) => ({ ...x, icon: icon(x) }));
       const ids = new Set(have.map((x) => x.id));
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       res.end(JSON.stringify({
-        installed: have.map(({ id, name, version, credits }) => ({ id, name, version, credits })),
-        available: scenes.catalog().filter((x) => !ids.has(x.id)).map(({ id, name, version, size, credits }) => ({ id, name, version, size, credits })),
+        installed: have.map(({ id, name, version, credits, icon }) => ({ id, name, version, credits, icon })),
+        available: cat.filter((x) => !ids.has(x.id)).map(({ id, name, version, size, credits, icon }) => ({ id, name, version, size, credits, icon: icon || '🗺️' })),
       }));
     } else if (url.pathname === '/api/scenes/install' && req.method === 'POST') {
       // Same guard as shutdown: a custom header web pages can't send cross-site.

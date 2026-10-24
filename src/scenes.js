@@ -35,7 +35,7 @@ function installed() {
       try {
         const m = JSON.parse(fs.readFileSync(path.join(dir, e.name, 'manifest.json'), 'utf8'));
         seen.add(e.name);
-        out.push({ id: e.name, name: m.name, version: m.version, credits: m.credits, dir: path.join(dir, e.name) });
+        out.push({ id: e.name, name: m.name, version: m.version, credits: m.credits, icon: m.icon, dir: path.join(dir, e.name) });
       } catch {}
     }
   }
