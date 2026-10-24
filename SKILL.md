@@ -29,6 +29,8 @@ node "<base directory>/bin/cli.js" --stop
 
 and say it's stopped.
 Then tell the user, in one line, that the office is open at the printed URL.
+If the output also says **"Update available: vA → vB"**, tell the user a new
+version is out and offer to update it (`/myoffice update`, below).
 Requires Node.js 18+; if `node` is missing, say so and stop.
 
 ## Scenes (3D)

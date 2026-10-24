@@ -141,6 +141,9 @@
   .tip .card { box-shadow: 0 8px 30px rgba(0,0,0,.18); }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; color: var(--muted); font-size: 12px; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .newver { border: 1px solid var(--tool); background: color-mix(in srgb, var(--tool) 18%, var(--panel)); color: var(--ink); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12.5px; cursor: pointer; animation: glowv 2.4s ease-in-out infinite; }
+  .newver:disabled { opacity: .7; cursor: default; animation: none; }
+  @keyframes glowv { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--tool) 25%, transparent); } }
   .ver { position: fixed; right: 14px; bottom: 12px; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--faint); z-index: 5; }
   .ver button { border: 1px solid var(--tool); background: color-mix(in srgb, var(--tool) 14%, var(--panel)); color: var(--ink); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer; }
   .ver button:disabled { opacity: .6; cursor: default; }
@@ -156,6 +159,7 @@
   <header>
     <h1>👀 <span data-t="title"></span></h1>
     <div class="summary" id="summary"></div>
+    <button class="newver" id="newVer" hidden></button>
     <div class="controls">
       <div class="seg" id="viewSeg">
         <button data-v="office" data-t="office"></button>
@@ -582,6 +586,11 @@ function renderVersion() {
       : `<span>${esc(L.gitPull)} → v${esc(verInfo.latest)}</span>` + html;
   }
   verEl.innerHTML = html;
+  // a second, more visible way in, next to the title
+  const top = document.getElementById('newVer');
+  top.hidden = !(verInfo.updateAvailable && verInfo.canUpdate);
+  if (!top.hidden && !top.disabled) top.textContent = `⬆ ${L.newVersion} v${verInfo.latest}`;
+  top.onclick = () => { const b2 = document.getElementById('updBtn'); if (b2) { top.disabled = true; top.textContent = L.updating; b2.click(); } };
   const b = document.getElementById('updBtn');
   if (b) b.onclick = async () => {
     b.disabled = true; b.textContent = L.updating;

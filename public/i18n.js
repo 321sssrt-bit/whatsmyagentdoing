@@ -4,6 +4,7 @@
 (() => {
   const S = {
     en: {
+      newVersion: 'New version',
       update: 'Update to', updating: 'Updating…', updateFailed: "Couldn't update", updated: 'Updated — reloading…', gitPull: 'Update with git pull',
       dl: 'download', installing: 'Downloading the scene…', installFailed: "Couldn't download the scene.",
       langName: 'English', html: 'en',
@@ -17,6 +18,7 @@
       doneNote: (p) => `${p} is done`,
     },
     'zh-TW': {
+      newVersion: '新版本',
       update: '更新到', updating: '正在更新…', updateFailed: '更新失敗', updated: '更新完成，重新載入中…', gitPull: '用 git pull 更新',
       dl: '下載', installing: '正在下載場景…', installFailed: '場景下載失敗。',
       langName: '繁體中文', html: 'zh-Hant',
@@ -30,6 +32,7 @@
       doneNote: (p) => `${p} 完成了`,
     },
     'zh-CN': {
+      newVersion: '新版本',
       update: '更新到', updating: '正在更新…', updateFailed: '更新失败', updated: '更新完成，正在重新加载…', gitPull: '用 git pull 更新',
       dl: '下载', installing: '正在下载场景…', installFailed: '场景下载失败。',
       langName: '简体中文', html: 'zh-Hans',
@@ -43,6 +46,7 @@
       doneNote: (p) => `${p} 完成了`,
     },
     ja: {
+      newVersion: '新バージョン',
       update: '更新:', updating: '更新中…', updateFailed: '更新できませんでした', updated: '更新しました — 再読み込み中…', gitPull: 'git pull で更新',
       dl: 'ダウンロード', installing: 'シーンをダウンロード中…', installFailed: 'シーンをダウンロードできませんでした。',
       langName: '日本語', html: 'ja',
@@ -56,6 +60,7 @@
       doneNote: (p) => `${p} が完了しました`,
     },
     ko: {
+      newVersion: '새 버전',
       update: '업데이트:', updating: '업데이트 중…', updateFailed: '업데이트 실패', updated: '업데이트 완료 — 새로고침 중…', gitPull: 'git pull로 업데이트',
       dl: '다운로드', installing: '장면 다운로드 중…', installFailed: '장면을 다운로드하지 못했습니다.',
       langName: '한국어', html: 'ko',
@@ -69,6 +74,7 @@
       doneNote: (p) => `${p} 완료`,
     },
     es: {
+      newVersion: 'Nueva versión',
       update: 'Actualizar a', updating: 'Actualizando…', updateFailed: 'No se pudo actualizar', updated: 'Actualizado — recargando…', gitPull: 'Actualiza con git pull',
       dl: 'descargar', installing: 'Descargando la escena…', installFailed: 'No se pudo descargar la escena.',
       langName: 'Español', html: 'es',
@@ -82,6 +88,7 @@
       doneNote: (p) => `${p} terminó`,
     },
     fr: {
+      newVersion: 'Nouvelle version',
       update: 'Mettre à jour vers', updating: 'Mise à jour…', updateFailed: 'Échec de la mise à jour', updated: 'Mis à jour — rechargement…', gitPull: 'Mettre à jour avec git pull',
       dl: 'télécharger', installing: 'Téléchargement de la scène…', installFailed: 'Impossible de télécharger la scène.',
       langName: 'Français', html: 'fr',
@@ -95,6 +102,7 @@
       doneNote: (p) => `${p} a terminé`,
     },
     de: {
+      newVersion: 'Neue Version',
       update: 'Aktualisieren auf', updating: 'Wird aktualisiert…', updateFailed: 'Aktualisierung fehlgeschlagen', updated: 'Aktualisiert – wird neu geladen…', gitPull: 'Mit git pull aktualisieren',
       dl: 'herunterladen', installing: 'Szene wird heruntergeladen…', installFailed: 'Szene konnte nicht geladen werden.',
       langName: 'Deutsch', html: 'de',
@@ -108,6 +116,7 @@
       doneNote: (p) => `${p} ist fertig`,
     },
     pt: {
+      newVersion: 'Nova versão',
       update: 'Atualizar para', updating: 'Atualizando…', updateFailed: 'Não foi possível atualizar', updated: 'Atualizado — recarregando…', gitPull: 'Atualize com git pull',
       dl: 'baixar', installing: 'Baixando o cenário…', installFailed: 'Não foi possível baixar o cenário.',
       langName: 'Português', html: 'pt',
