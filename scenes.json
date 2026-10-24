@@ -20,6 +20,25 @@
       "url": "https://github.com/Charonyuu/whatsmyagentdoing/releases/download/scenes/cafe-v1.tar.gz"
     },
     {
+      "id": "castle",
+      "version": 1,
+      "name": {
+        "en": "Castle",
+        "zh-TW": "城堡",
+        "zh-CN": "城堡",
+        "ja": "お城",
+        "ko": "성",
+        "es": "Castillo",
+        "fr": "Château",
+        "de": "Burg",
+        "pt": "Castelo"
+      },
+      "credits": "Models: Kenney Castle Kit, Food Kit, Pirate Kit, Furniture Kit (CC0)",
+      "size": 165298,
+      "sha256": "cfdc4f138164597ca7ff70ef97284a82b0ceda50731dade94e39602696c5d8b6",
+      "url": "https://github.com/Charonyuu/whatsmyagentdoing/releases/download/scenes/castle-v1.tar.gz"
+    },
+    {
       "id": "pirate",
       "version": 3,
       "name": {

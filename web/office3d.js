@@ -601,7 +601,9 @@ export class Office3D extends window.Office {
   buildSceneProp(p) {
     const flat = ['sandbase', 'floor', 'wall', 'sign', 'pendant', 'stars', 'planet', 'lamp'];
     const ground = (p.m && p.m.startsWith('patch-')) || flat.includes(p.special) || p.abs ? 0 : this.surfaceAt(p.x + (p.w || 0) / 2, p.y + (p.d || 0) / 2);
-    if (p.special === 'fire') return this.buildFire(p.x, p.y, ground);
+    if (p.special === 'fire') return this.buildFire(p.x, p.y, ground + (p.y0 || 0), p);
+    if (p.special === 'target') return this.buildTarget(p, ground);
+    if (p.special === 'well') return this.buildWell(p, ground);
     if (p.special === 'map') return this.buildMap({ ...p, y0: ground + (p.y0 ?? 0.78) });
     if (p.special === 'dock') return this.buildDock(p);
     if (p.special === 'floor') return this.buildFloor(p);
@@ -645,7 +647,7 @@ export class Office3D extends window.Office {
     if (m && p.bob) this.bobbers.push({ m, y: m.position.y, ph: p.x * 0.7 });
   }
 
-  buildFire(x, y, ground = 0.25) {
+  buildFire(x, y, ground = 0.25, opts = {}) {
     const g = new THREE.Group();
     const wood = new THREE.MeshStandardMaterial({ color: 0x6b4426, roughness: 1 });
     for (let i = 0; i < 3; i++) {
@@ -657,7 +659,7 @@ export class Office3D extends window.Office {
       g.add(log);
     }
     const stone = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness: 1, flatShading: true });
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < (opts.stones === false ? 0 : 9); i++) {
       const a = (i / 9) * Math.PI * 2;
       const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.09), stone);
       r.position.set(Math.cos(a) * 0.45, 0.3, Math.sin(a) * 0.45);
@@ -671,6 +673,7 @@ export class Office3D extends window.Office {
     light.position.y = 0.9;
     g.add(outer, inner, light);
     g.position.set(x, ground - 0.25, y); // parts are laid out for a 0.25 sand top
+    if (opts.scale) g.scale.setScalar(opts.scale);
     this.room.add(g);
     this.flames.push({ outer, inner, light });
   }
@@ -805,6 +808,49 @@ export class Office3D extends window.Office {
       this.room.add(ring);
     }
     this.planet = planet;
+  }
+
+  // An archery target on a wooden stand, facing `yaw` degrees.
+  buildTarget(p, ground) {
+    const g = new THREE.Group();
+    const wood = new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 1 });
+    for (const dz of [-0.28, 0.28]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.2, 0.06), wood);
+      leg.position.set(-0.12, 0.6, dz); leg.rotation.z = 0.18; leg.castShadow = true; g.add(leg);
+    }
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const c = cv.getContext('2d');
+    ['#f4efe2', '#d23c2f', '#f4efe2', '#d23c2f', '#f2c14e'].forEach((col, i) => {
+      c.fillStyle = col; c.beginPath(); c.arc(64, 64, 62 - i * 12, 0, Math.PI * 2); c.fill();
+    });
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.38, 32), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
+    const back = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.08, 32), new THREE.MeshStandardMaterial({ color: 0xd8c08a, roughness: 1 }));
+    back.rotation.z = Math.PI / 2; back.position.set(0, 0.95, 0); back.castShadow = true;
+    face.rotation.y = Math.PI / 2; face.position.set(0.045, 0.95, 0);
+    g.add(back, face);
+    g.rotation.y = ((p.yaw ?? -90) * Math.PI) / 180 + Math.PI / 2;
+    g.position.set(p.x, ground, p.y);
+    this.room.add(g);
+  }
+
+  // A stone well with a little roof and a bucket.
+  buildWell(p, ground) {
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8d8a84, roughness: 1, flatShading: true });
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.6, 12, 1, true), stone);
+    ring.material.side = THREE.DoubleSide; ring.position.y = 0.3; ring.castShadow = true;
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.5, 12), new THREE.MeshStandardMaterial({ color: 0x2f6f9a, roughness: 0.2 }));
+    water.rotation.x = -Math.PI / 2; water.position.y = 0.35;
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b4426, roughness: 1 });
+    for (const dx of [-0.5, 0.5]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.08), wood); post.position.set(dx, 0.95, 0); post.castShadow = true; g.add(post); }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.45, 4), new THREE.MeshStandardMaterial({ color: 0x9c3b2e, roughness: 0.9 }));
+    roof.position.y = 1.8; roof.rotation.y = Math.PI / 4; roof.castShadow = true;
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.16, 10), wood);
+    bucket.position.set(0, 1.05, 0);
+    g.add(ring, water, roof, bucket);
+    g.position.set(p.x, ground, p.y);
+    this.room.add(g);
   }
 
   // A hanging lamp: cord, shade and a soft warm light.
