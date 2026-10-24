@@ -124,6 +124,7 @@ class Watcher extends EventEmitter {
     this.windowMs = hours * 3600 * 1000;
     this.interval = interval;
     this.trackers = new Map(); // file -> { session, offset, partial, apply }
+    this.failed = new Map();   // file -> retry-after time, for logs we couldn't read
     this.codexNames = new Map();
     this.geminiProjects = new Map(); // tmp dir name -> project path
     this.geminiRegistryMtime = 0;
@@ -187,29 +188,15 @@ class Watcher extends EventEmitter {
     }
 
     for (const c of this.candidates) {
-      const st = statSafe(c.file);
-      if (!st) continue;
-      let t = this.trackers.get(c.file);
-      if (!t) {
-        if (st.mtimeMs < since) continue;
-        t = this.open(c, st);
-        changed = true;
-        continue;
-      }
-      if (t.whole && st.mtimeMs !== t.mtime) {
-        // legacy single-document session: re-read it whole
-        this.trackers.delete(c.file);
-        this.open(c, st);
-        changed = true;
-      } else if (st.size > t.offset) {
-        this.feed(t, readRange(c.file, t.offset, st.size), false);
-        t.offset = st.size;
-        changed = true;
-      } else if (st.size < t.offset) {
-        // File was rewritten; start over.
+      // A log we can't read (permissions, deleted mid-read…) is skipped and
+      // retried a minute later; it must never take the server down.
+      if ((this.failed.get(c.file) || 0) > now) continue;
+      try {
+        if (this.track(c, since)) changed = true;
+      } catch {
+        this.failed.set(c.file, now + 60000);
         this.trackers.delete(c.file);
       }
-      t.session.mtime = st.mtimeMs;
     }
 
     for (const [file, t] of this.trackers) {
@@ -217,6 +204,34 @@ class Watcher extends EventEmitter {
     }
 
     if (changed) this.emit('change');
+  }
+
+  // Returns true when this file's session changed.
+  track(c, since) {
+    const st = statSafe(c.file);
+    if (!st) return false;
+    const t = this.trackers.get(c.file);
+    if (!t) {
+      if (st.mtimeMs < since) return false;
+      this.open(c, st);
+      return true;
+    }
+    let changed = false;
+    if (t.whole && st.mtimeMs !== t.mtime) {
+      // legacy single-document session: re-read it whole
+      this.trackers.delete(c.file);
+      this.open(c, st);
+      return true;
+    } else if (st.size > t.offset) {
+      this.feed(t, readRange(c.file, t.offset, st.size), false);
+      t.offset = st.size;
+      changed = true;
+    } else if (st.size < t.offset) {
+      // File was rewritten; start over.
+      this.trackers.delete(c.file);
+    }
+    t.session.mtime = st.mtimeMs;
+    return changed;
   }
 
   open(c, st) {

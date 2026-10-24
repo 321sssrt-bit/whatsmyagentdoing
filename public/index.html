@@ -288,11 +288,14 @@ function timeLabel(s, now) {
   return s.lastEventAt ? ago(s.lastEventAt, now) : '';
 }
 
+// Single-quote for POSIX shells: inside '…' nothing ($(), backticks, $VAR)
+// is expanded, so a folder or session name can't run anything when pasted.
+const shq = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
 function resumeCmd(s) {
-  const cd = s.cwd ? `cd ${JSON.stringify(s.cwd)} && ` : '';
-  if (s.agent === 'claude') return `${cd}claude --resume ${s.id}`;
-  if (s.agent === 'gemini') return `${cd}gemini --resume ${s.sessionId || s.id}`;
-  return `${cd}codex resume ${s.id}`;
+  const cd = s.cwd ? `cd ${shq(s.cwd)} && ` : '';
+  if (s.agent === 'claude') return `${cd}claude --resume ${shq(s.id)}`;
+  if (s.agent === 'gemini') return `${cd}gemini --resume ${shq(s.sessionId || s.id)}`;
+  return `${cd}codex resume ${shq(s.id)}`;
 }
 
 function card(s, now) {

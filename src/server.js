@@ -93,7 +93,8 @@ function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
   let last = '';
 
   const push = (force) => {
-    const body = JSON.stringify(snapshot(watcher, opts));
+    let body;
+    try { body = JSON.stringify(snapshot(watcher, opts)); } catch (e) { console.error('snapshot failed:', e.message); return; }
     // Compare without the timestamp so idle ticks don't spam clients.
     const sig = body.replace(/^\{"now":\d+,/, '{');
     if (!force && sig === last) return;
