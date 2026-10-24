@@ -559,7 +559,11 @@ export class Office3D extends window.Office {
     this.bobbers = [];
     this.flames = [];
     this.pendants = [];
+    this.pulsers = [];
     this.windowMat = null;
+    this.clearMat = null;
+    this.stars = null;
+    this.planet = null;
     this.scene.background = def.background === null ? null : new THREE.Color(def.background || def.sky || '#9fd3ef');
     if (def.fog) this.scene.fog = new THREE.Fog(def.fog[0], def.fog[1], def.fog[2]);
 
@@ -595,12 +599,29 @@ export class Office3D extends window.Office {
   }
 
   buildSceneProp(p) {
-    const flat = ['sandbase', 'floor', 'wall', 'sign', 'pendant'];
+    const flat = ['sandbase', 'floor', 'wall', 'sign', 'pendant', 'stars', 'planet', 'lamp'];
     const ground = (p.m && p.m.startsWith('patch-')) || flat.includes(p.special) || p.abs ? 0 : this.surfaceAt(p.x + (p.w || 0) / 2, p.y + (p.d || 0) / 2);
     if (p.special === 'fire') return this.buildFire(p.x, p.y, ground);
     if (p.special === 'map') return this.buildMap({ ...p, y0: ground + (p.y0 ?? 0.78) });
     if (p.special === 'dock') return this.buildDock(p);
     if (p.special === 'floor') return this.buildFloor(p);
+    if (p.special === 'stars') return this.buildStars(p);
+    if (p.special === 'lamp') {
+      // an unseen ceiling light
+      const l = new THREE.PointLight(p.color || '#ffffff', p.intensity ?? 1, p.range || 6);
+      l.position.set(p.x, p.z || 2.3, p.y);
+      this.room.add(l);
+      return;
+    }
+    if (p.special === 'planet') return this.buildPlanet(p);
+    if (p.special === 'glow') {
+      // an emissive strip or panel (light bars, screens, floor markings)
+      const m = this.boxMesh(p.x, p.y, ground + (p.y0 || 0), p.w, p.d, p.h || 0.03, 0, {
+        mat: new THREE.MeshStandardMaterial({ color: p.color || '#5ad1ff', emissive: p.color || '#5ad1ff', emissiveIntensity: p.intensity ?? 1.2 }), shadow: false,
+      });
+      if (p.pulse) (this.pulsers = this.pulsers || []).push({ m, base: p.intensity ?? 1.2, ph: p.x + p.y });
+      return m;
+    }
     if (p.special === 'wall') return this.buildWall(p);
     if (p.special === 'sign') return this.buildSign(p);
     if (p.special === 'pendant') return this.buildPendant(p);
@@ -683,7 +704,12 @@ export class Office3D extends window.Office {
   buildWall(p) {
     const h = p.h || 2.4, t = p.t || 0.12;
     const mat = new THREE.MeshStandardMaterial({ color: p.color || (this.pal.dark ? '#4a4640' : '#f1ebe0'), roughness: 0.95 });
-    if (!this.windowMat) this.windowMat = new THREE.MeshStandardMaterial({ color: this.plan.scene.sky || '#a9d4f2', emissive: this.plan.scene.sky || '#a9d4f2', emissiveIntensity: 0.6 });
+    if (p.clear) {
+      this.clearMat = this.clearMat || new THREE.MeshPhysicalMaterial({ color: '#9fd8ff', transparent: true, opacity: 0.12, roughness: 0.05, depthWrite: false });
+    } else if (!this.windowMat) {
+      this.windowMat = new THREE.MeshStandardMaterial({ color: this.plan.scene.sky || '#a9d4f2', emissive: this.plan.scene.sky || '#a9d4f2', emissiveIntensity: 0.6 });
+    }
+    const paneMat = p.clear ? this.clearMat : this.windowMat;
     const seg = (a, len, z0, z1) => {
       if (len <= 0.001 || z1 - z0 <= 0.001) return;
       if (p.axis === 'z') this.boxMesh(p.x - t, p.y + a, z0, t, len, z1 - z0, 0, { mat });
@@ -697,7 +723,7 @@ export class Office3D extends window.Office {
       seg(from, len, top, h);
       if (bot > 0.05) {
         // window pane + a mullion in the middle
-        const pane = new THREE.Mesh(new THREE.PlaneGeometry(len, top - bot), this.windowMat);
+        const pane = new THREE.Mesh(new THREE.PlaneGeometry(len, top - bot), paneMat);
         if (p.axis === 'z') { pane.rotation.y = Math.PI / 2; pane.position.set(p.x - t / 2, (bot + top) / 2, p.y + from + len / 2); }
         else pane.position.set(p.x + from + len / 2, (bot + top) / 2, p.y - t / 2);
         this.room.add(pane);
@@ -739,6 +765,46 @@ export class Office3D extends window.Office {
     if (p.face === '+x') { m.rotation.y = Math.PI / 2; m.position.set(p.x + 0.01, p.z, p.y); }
     else m.position.set(p.x, p.z, p.y + 0.01);
     this.room.add(m);
+  }
+
+  // A field of stars on a big sphere around the scene.
+  buildStars(p) {
+    const n = p.count || 900, r = p.r || 70;
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, k = Math.sqrt(1 - u * u);
+      pos[i * 3] = this.plan.W / 2 + Math.cos(a) * k * r;
+      pos[i * 3 + 1] = u * r * 0.6;
+      pos[i * 3 + 2] = this.plan.D / 2 + Math.sin(a) * k * r;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.stars = new THREE.Points(g, new THREE.PointsMaterial({ color: '#ffffff', size: p.size || 0.35, sizeAttenuation: true, fog: false }));
+    this.room.add(this.stars);
+  }
+
+  // A planet (with an optional ring) out beyond the windows.
+  buildPlanet(p) {
+    const cv = document.createElement('canvas');
+    cv.width = 256; cv.height = 128;
+    const c = cv.getContext('2d');
+    const cols = p.colors || ['#e08a5a', '#c76b45', '#f0b27a', '#a85a3c'];
+    for (let y = 0; y < 128; y += 4) { c.fillStyle = cols[Math.floor((Math.sin(y * 0.21) + 1) * 1.99) % cols.length]; c.fillRect(0, y, 256, 4); }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const planet = new THREE.Mesh(new THREE.SphereGeometry(p.r || 6, 40, 24), new THREE.MeshStandardMaterial({ map: tex, roughness: 1, fog: false }));
+    planet.position.set(p.x, p.z || 0, p.y);
+    planet.rotation.z = 0.35;
+    this.room.add(planet);
+    if (p.ring) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry((p.r || 6) * 1.3, (p.r || 6) * 1.75, 64),
+        new THREE.MeshBasicMaterial({ color: p.ring, transparent: true, opacity: 0.4, side: THREE.DoubleSide, fog: false }));
+      ring.position.copy(planet.position);
+      ring.rotation.x = -Math.PI / 2 + 0.45;
+      ring.rotation.y = 0.3;
+      this.room.add(ring);
+    }
+    this.planet = planet;
   }
 
   // A hanging lamp: cord, shade and a soft warm light.
@@ -812,7 +878,10 @@ export class Office3D extends window.Office {
       f.inner.scale.set(1, 1.6 - k * 0.6, 1);
       f.light.intensity = (sky.night ? 3 : 1.2) * k;
     }
-    if (this.scene.background) this.scene.background.set(sky.night ? '#13213f' : (def.background || def.sky || '#9fd3ef'));
+    if (this.scene.background && !def.fixedSky) this.scene.background.set(sky.night ? '#13213f' : (def.background || def.sky || '#9fd3ef'));
+    if (this.planet) this.planet.rotation.y = t * 0.03;
+    if (this.stars) this.stars.rotation.y = t * 0.004;
+    for (const g of this.pulsers || []) g.m.material.emissiveIntensity = g.base * (0.65 + 0.35 * Math.sin(t * 2.2 + g.ph));
     if (this.windowMat) { this.windowMat.color.set(sky.night ? '#1d2747' : def.sky); this.windowMat.emissive.set(sky.night ? '#1d2747' : def.sky); }
     for (const l of this.pendants || []) l.intensity = sky.night ? 1.6 : 0.7;
     if (this.scene.fog) this.scene.fog.color.set(sky.night ? '#1b2a4a' : def.fog[0]);
@@ -936,7 +1005,7 @@ export class Office3D extends window.Office {
 
       // position + facing
       const dx = p.x - a.last.x, dy = p.y - a.last.y;
-      let want = this.facing(p, st);
+      let want = st.pose !== 'walk' && p.poi && p.poi.float ? null : this.facing(p, st);
       if (want == null && Math.hypot(dx, dy) > 0.001) want = Math.atan2(dx, dy);
       if (want != null) {
         let d = want - a.yaw;
@@ -950,7 +1019,14 @@ export class Office3D extends window.Office {
       // The sit pose's torso leans back past its origin; slide the body
       // forward so the back rests against the backrest instead of in it.
       const fwd = st.pose === 'sit' ? SIT_FORWARD : 0;
-      a.obj.position.set(p.x + Math.sin(a.yaw) * fwd, seatY, p.y + Math.cos(a.yaw) * fwd);
+      let lift = 0;
+      if (st.pose !== 'walk' && p.poi && p.poi.float) {
+        // zero gravity: drift up and down, slowly turning
+        const k = this.t / 1000 + p.phase;
+        lift = 0.45 + Math.sin(k * 0.9) * 0.18;
+        a.yaw += dt * 0.35;
+      }
+      a.obj.position.set(p.x + Math.sin(a.yaw) * fwd, seatY + lift, p.y + Math.cos(a.yaw) * fwd);
       if (a.head) {
         if (st.act === 'nap') { a.head.rotation.x = a.headRest + 0.55; a.napped = true; }
         else if (a.napped) { a.head.rotation.x = a.headRest; a.napped = false; }
@@ -1086,7 +1162,8 @@ export class Office3D extends window.Office {
       const st = this.stateOf(p);
       const scale = p.s.subagent ? 0.8 : 1;
       const base = this.plan.terrain && st.pose !== 'sit' ? this.groundHeight(p.x, p.y) : 0;
-      const top = st.pose === 'sit' ? this.seatHeight(p.x, p.y, st.sitZ) + CHAR_HEIGHT * 0.8 * scale : base + CHAR_HEIGHT * scale;
+      const floatUp = st.pose !== 'walk' && p.poi && p.poi.float ? 0.45 + Math.sin((this.t / 1000 + p.phase) * 0.9) * 0.18 : 0;
+      const top = (st.pose === 'sit' ? this.seatHeight(p.x, p.y, st.sitZ) + CHAR_HEIGHT * 0.8 * scale : base + CHAR_HEIGHT * scale) + floatUp;
       v.set(p.x, top + 0.05, p.y).project(this.camera);
       const sx = (v.x + 1) / 2 * this.cw, sy = (1 - v.y) / 2 * this.ch;
       const foot = new THREE.Vector3(p.x, 0, p.y).project(this.camera);

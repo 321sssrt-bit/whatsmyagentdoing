@@ -37,6 +37,25 @@
       "size": 140841,
       "sha256": "5f8ce658a93aa73b02f63ba2c77f2cd8e65b63a66f47a0880e50ff4e564f4836",
       "url": "https://github.com/Charonyuu/whatsmyagentdoing/releases/download/scenes/pirate-v3.tar.gz"
+    },
+    {
+      "id": "station",
+      "version": 1,
+      "name": {
+        "en": "Space Station",
+        "zh-TW": "太空站",
+        "zh-CN": "空间站",
+        "ja": "宇宙ステーション",
+        "ko": "우주 정거장",
+        "es": "Estación espacial",
+        "fr": "Station spatiale",
+        "de": "Raumstation",
+        "pt": "Estação espacial"
+      },
+      "credits": "Models: Kenney Space Station Kit, Space Kit (CC0)",
+      "size": 140442,
+      "sha256": "15b11fcbd89d67f8e69b9b8fa7ef97a2b58be83ec18c12d0c333f66cfc2fbb31",
+      "url": "https://github.com/Charonyuu/whatsmyagentdoing/releases/download/scenes/station-v1.tar.gz"
     }
   ]
 }
