@@ -14,6 +14,7 @@ async function screenshot(page, name) {
   fs.mkdirSync(screenshots, { recursive: true });
   await page.screenshot({ path: path.join(screenshots, name + '.png') });
 }
+const clientsOnly = process.env.WMAD_UI_CLIENTS_ONLY === '1';
 const checks=[];
 const check=(name)=>{checks.push(name);console.log('PASS',name)};
 const sessions = [
@@ -90,6 +91,7 @@ async function drawnLogos(target) {
   await screenshot(page, 'office-3d');
   assert.deepEqual(await drawnLogos(page),['claude','codex','gemini']);
   check('3D renders the same official provider logos');
+  if (!clientsOnly) {
   await page.click('#pipBtn');await page.waitForFunction(()=>!!popout.win);
   const pip=context.pages().find(p=>p!==page);assert.ok(pip);
   const frame=await (async()=>{for(let i=0;i<100;i++){const f=pip.frames().find(f=>f.url().includes('?pip=1'));if(f)return f;await new Promise(r=>setTimeout(r,50))}throw Error('No compact frame')})();
@@ -174,6 +176,81 @@ async function drawnLogos(target) {
   assert.equal(await page.locator('#settingsMenu > summary').evaluate(el=>el===document.activeElement),true);
   await openSettings(page);await page.click('h1');
   assert.equal(await page.locator('#settingsPanel').isVisible(),false);
+  }
+  const nativeClients = [
+   {key:'kimi:one',id:'one',sessionId:'one',agent:'kimi',status:'thinking',cwd:'/demo/kimi'},
+   {key:'dsh:two',id:'two',agent:'dsh',status:'waiting',activity:'Shell',cwd:'/demo/dsh'},
+   {key:'grok:three',id:'three',agent:'grok',status:'tool',activity:'Read',cwd:'/demo/grok'},
+   {key:'kimi:one/agent-1',id:'one/agent-1',sessionId:'one',parentId:'one',subagent:true,agent:'kimi',status:'thinking',cwd:'/demo/kimi'},
+  ].map(s=>({...s,lastEventAt:Date.now()}));
+  await page.evaluate(s=>{state.agent='all';state.showSub=false;onData({now:Date.now(),sessions:s})},nativeClients);
+  await page.evaluate(s=>onData({now:Date.now(),sessions:s}),nativeClients);
+  for (const agent of ['kimi','dsh','grok']) {
+   assert.equal(await page.locator(`#agentSeg button[data-v="${agent}"]`).count(),1);
+   const logo=page.locator(`#agentSeg button[data-v="${agent}"] img`);
+   await page.waitForFunction(agent=>{
+    const img=document.querySelector(`#agentSeg button[data-v="${agent}"] img`);
+    return img?.complete&&img.naturalWidth>0;
+   },agent);
+   assert.equal(await logo.evaluate(img=>img.complete&&img.naturalWidth>0),true);
+   assert.equal(await page.locator(`#agentLegend img[src="/assets/agents/${agent}.svg"]`).count(),1);
+  }
+  await page.click('#viewSeg [data-v=list]');
+  assert.equal(await page.locator('.card').count(),3);
+  assert.match(await page.locator('[data-key="dsh:two"] .copy').getAttribute('data-copy'),/dsh tui --resume 'two'/);
+  assert.match(await page.locator('[data-key="kimi:one"] .copy').getAttribute('data-copy'),/kimi --session 'one'/);
+  assert.match(await page.locator('[data-key="grok:three"] .copy').getAttribute('data-copy'),/grok --resume 'three'/);
+  await openSettings(page);await page.click('#agentSeg [data-v=kimi] img');
+  assert.equal(await page.locator('.card').count(),1);
+  await openSettings(page);await page.check('#showSub');
+  assert.equal(await page.locator('.card').count(),2);
+  await openSettings(page);await page.click('#agentSeg [data-v=all]');
+  await page.click('#viewSeg [data-v=office]');
+  for (const quality of ['mid','high']) {
+   await page.click(`#qualSeg [data-v=${quality}]`);
+   await page.waitForFunction(q=>officeKind.startsWith(q)&&office.framesShown>4&&(q!=='high'||office.loaded),quality);
+   assert.deepEqual([...new Set(await badges(page))].sort(),['Ds','Gr','Ki']);
+   assert.deepEqual(await drawnLogos(page),['dsh','grok','kimi']);
+   assert.equal(await page.evaluate(()=>office.people.has('kimi:one/agent-1')),true);
+  }
+  check('Kimi, DSH and Grok support filters, subagents, resume commands and packaged logos in both offices');
+  for (const colorScheme of ['light','dark']) {
+   await page.emulateMedia({colorScheme});
+   await page.click('#viewSeg [data-v=list]');
+   await openSettings(page);
+   for (const agent of ['kimi','dsh','grok']) {
+    const selector=`#agentSeg [data-v="${agent}"] img`;
+    const filter=await page.locator(selector).evaluate(img=>getComputedStyle(img).filter);
+    assert.equal(filter,colorScheme==='dark'&&agent!=='dsh'?'invert(1)':'none');
+   }
+   await screenshot(page,`list-${colorScheme}`);
+   await page.locator('#settingsMenu > summary').press('Escape');
+   await page.click('#viewSeg [data-v=office]');
+   for(const quality of ['mid','high']) {
+    await page.click(`#qualSeg [data-v=${quality}]`);
+    await page.waitForFunction(q=>officeKind.startsWith(q)&&office.framesShown>4&&(q!=='high'||office.loaded),quality);
+    assert.deepEqual(await drawnLogos(page),['dsh','grok','kimi']);
+    await screenshot(page,`office-${quality}-${colorScheme}`);
+   }
+  }
+  check('list, filters, legend and both offices preserve light/dark native logos');
+  const fallbackPage=await context.newPage();
+  await fallbackPage.route('**/assets/agents/kimi.svg',route=>route.abort());
+  await fallbackPage.goto(base);
+  await fallbackPage.waitForFunction(()=>state.loaded);
+  await fallbackPage.evaluate(s=>{__events.close();state.agent='all';state.showSub=true;onData({now:Date.now(),sessions:s})},nativeClients);
+  await fallbackPage.click('#qualSeg [data-v=mid]');
+  await fallbackPage.waitForFunction(()=>officeKind==='mid'&&office.framesShown>4&&OFFICE_AGENT_BADGES.kimi.image.complete);
+  assert.equal(await fallbackPage.evaluate(()=>OFFICE_AGENT_BADGES.kimi.image.naturalWidth),0);
+  assert.equal(await fallbackPage.evaluate(()=>{
+   const texts=[],ctx=office.ctx,original=ctx.fillText;
+   ctx.fillText=function(text,...args){texts.push(text);return original.call(this,text,...args)};
+   try {office.frame(performance.now());} finally {ctx.fillText=original;}
+   return texts.includes('Ki');
+  }),true);
+  await fallbackPage.close();
+  check('a failed Kimi image still draws the existing canvas initials');
+  if (!clientsOnly) {
   for (const width of [320,390,768,1280]) {
    await page.setViewportSize({width,height:800});
    for (const colorScheme of ['light','dark']) {
@@ -187,6 +264,7 @@ async function drawnLogos(target) {
    }
   }
   check('settings close with Escape/outside click, restore focus, and fit narrow and wide screens in both themes');
+  }
   assert.deepEqual(errors,[]);check('no uncaught browser errors');
   console.log('TOTAL',checks.length);
  } finally {

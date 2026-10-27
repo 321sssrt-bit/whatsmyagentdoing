@@ -25,6 +25,9 @@
     claude: { label: 'Claude', short: 'Cl', color: '#c96442', logo: '/assets/agents/claude.png' },
     codex: { label: 'Codex', short: 'Cx', color: '#10a37f', logo: '/assets/agents/codex.png' },
     gemini: { label: 'Gemini', short: 'G', color: '#4f7cf0', logo: '/assets/agents/gemini.png' },
+    kimi: { label: 'Kimi Code', short: 'Ki', logo: '/assets/agents/kimi.svg', mono: true },
+    dsh: { label: 'DSH', short: 'Ds', logo: '/assets/agents/dsh.svg' },
+    grok: { label: 'Grok Build', short: 'Gr', logo: '/assets/agents/grok.svg', mono: true },
   };
   for (const badge of Object.values(AGENT_BADGES)) {
     badge.image = new Image();
@@ -1411,6 +1414,7 @@
       c.save();
       c.globalAlpha = 1;
       if (badge.image.complete && badge.image.naturalWidth > 0) {
+        if (badge.mono && this.pal.dark) c.filter = 'invert(1)';
         c.imageSmoothingEnabled = true;
         c.imageSmoothingQuality = 'high';
         c.drawImage(badge.image, x - 9, y - 9, 18, 18);

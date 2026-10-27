@@ -85,7 +85,7 @@
   #sceneSeg { display: grid; grid-template-columns: 1fr 1fr; border: 0; padding: 0; gap: 6px; }
   #sceneSeg button { text-align: left; padding: 8px 10px; background: var(--bg); }
   #sceneSeg button.on { background: var(--line); color: var(--ink); box-shadow: inset 0 0 0 1px var(--faint); }
-  #agentSeg { display: flex; }
+  #agentSeg { display: flex; flex-wrap: wrap; }
   #agentSeg button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 8px 6px; }
   .setting-toggles { display: grid; gap: 12px; margin-top: 14px; }
   .setting-toggles .tog { color: var(--ink); gap: 8px; }
@@ -122,6 +122,9 @@
   .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .agent { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--muted); flex: none; }
   .agent-logo { width: 20px; height: 20px; object-fit: contain; padding: 1px; flex: none; }
+  @media (prefers-color-scheme: dark) {
+    .agent-logo.mono { filter: invert(1); }
+  }
   .project { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .time { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
   .title { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -243,9 +246,6 @@
             <span class="setting-label" id="filterLabel" data-t="agents"></span>
             <div class="seg" id="agentSeg" role="group" aria-labelledby="filterLabel">
               <button data-v="all" class="on" data-t="all"></button>
-              <button data-v="claude"><img class="agent-logo" src="/assets/agents/claude.png" alt="">Claude</button>
-              <button data-v="codex"><img class="agent-logo" src="/assets/agents/codex.png" alt="">Codex</button>
-              <button data-v="gemini"><img class="agent-logo" src="/assets/agents/gemini.png" alt="">Gemini</button>
             </div>
             <div class="setting-toggles">
               <label class="tog"><input type="checkbox" id="showSub"> <span data-t="subagents"></span></label>
@@ -365,7 +365,7 @@ const state = {
 let popout = null;
 
 const ACTIVE = new Set(['thinking', 'tool', 'typing']);
-const AGENT_NAME = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
+const AGENT_NAME = Object.fromEntries(Object.entries(OFFICE_AGENT_BADGES).map(([agent, badge]) => [agent, badge.label]));
 const GROUPS = [
   { key: 'needsYou', match: (s) => s === 'waiting' || s === 'error' },
   { key: 'working', match: (s) => ACTIVE.has(s) },
@@ -408,12 +408,23 @@ function resumeCmd(s) {
   const cd = s.cwd ? `cd ${shq(s.cwd)} && ` : '';
   if (s.agent === 'claude') return `${cd}claude --resume ${shq(s.id)}`;
   if (s.agent === 'gemini') return `${cd}gemini --resume ${shq(s.sessionId || s.id)}`;
+  if (s.agent === 'kimi') return `${cd}kimi --session ${shq(s.sessionId || s.id)}`;
+  if (s.agent === 'dsh') return `${cd}dsh tui --resume ${shq(s.id)}`;
+  if (s.agent === 'grok') return `${cd}grok --resume ${shq(s.id)}`;
   return `${cd}codex resume ${shq(s.id)}`;
 }
 
 function agentLogo(agent) {
   const badge = OFFICE_AGENT_BADGES[agent];
-  return badge ? `<img class="agent-logo" src="${badge.logo}" alt="" aria-hidden="true">` : '';
+  return badge ? `<img class="agent-logo${badge.mono ? ' mono' : ''}" src="${badge.logo}" alt="" aria-hidden="true">` : '';
+}
+
+function addAgentFilter(agent) {
+  const button = document.createElement('button');
+  button.dataset.v = agent;
+  button.innerHTML = `${agentLogo(agent)}${esc(AGENT_NAME[agent])}`;
+  document.getElementById('agentSeg').append(button);
+  document.getElementById('agentLegend').insertAdjacentHTML('beforeend', `<span>${agentLogo(agent)}${esc(AGENT_NAME[agent])}</span>`);
 }
 
 function card(s, now) {
@@ -511,6 +522,12 @@ function tickTimes() {
 }
 
 function onData(data) {
+  for (const s of data.sessions) {
+    if (!Object.hasOwn(OFFICE_AGENT_BADGES, s.agent)) continue;
+    if (!document.querySelector(`#agentSeg button[data-v="${s.agent}"]`)) {
+      addAgentFilter(s.agent);
+    }
+  }
   state.skew = Date.now() - data.now;
   const first = state.prev.size === 0;
   state.flash.clear();
@@ -526,6 +543,7 @@ function onData(data) {
   }
   state.data = data;
   state.loaded = true;
+  syncControls();
   applyLang(chooseLang(data.lang));
   render();
 }
@@ -775,8 +793,7 @@ langSel.addEventListener('change', () => {
   applyLang(chooseLang(state.data.lang));
   render();
 });
-document.getElementById('agentLegend').innerHTML = Object.entries(OFFICE_AGENT_BADGES)
-  .map(([key, a]) => `<span>${agentLogo(key)}${a.label}</span>`).join('');
+for (const agent of ['claude', 'codex', 'gemini']) addAgentFilter(agent);
 popout = new OfficePopout({
   preferences: () => ({ ...Object.fromEntries(Object.keys(PREF_DEFAULTS).map((k) => [k, state[k]])), lang: store.get('lang', 'auto') }),
   office: () => office,

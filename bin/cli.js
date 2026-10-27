@@ -3,7 +3,7 @@
 
 const http = require('http');
 const { spawn } = require('child_process');
-const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR } = require('../src/watcher');
+const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR, CLIENT_DIRS } = require('../src/watcher');
 const { DemoWatcher } = require('../src/demo');
 const scenes = require('../src/scenes');
 const updater = require('../src/update');
@@ -11,7 +11,7 @@ const { createServer, snapshot } = require('../src/server');
 const pkg = require('../package.json');
 
 const HELP = `whatsmyagentdoing ${pkg.version}
-See what every Claude Code, Codex and Gemini CLI agent on this machine is doing, live.
+See what every Claude Code, Codex, Gemini CLI, Kimi Code, DSH and Grok Build agent is doing, live.
 
 Usage: node bin/cli.js [options]   (or /myoffice as a skill)
 
@@ -33,7 +33,9 @@ Reads (never writes):
   ${CLAUDE_DIR}
   ${CODEX_DIR}
   ${GEMINI_DIR}
-Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
+  ${Object.values(CLIENT_DIRS).join('\n  ')}
+Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.
+Other clients: KIMI_CODE_HOME / DSH_HOME / GROK_HOME.`;
 
 function parseArgs(argv) {
   const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null, update: false };

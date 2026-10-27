@@ -59,7 +59,10 @@ The toolbar keeps the view, 2D/3D and pop-out controls visible. Scene selection,
 
 When Document PiP isn't available, **Pop out** in office view starts a local, view-only video preview of the 2D or 3D office. Use its video PiP button, or the browser's own video controls/context menu (such as Firefox's), to float it. Stop the preview when finished. No screen-sharing permission is needed and no video is uploaded. Background animation may run at a lower frame rate, depending on browser throttling; this fallback doesn't support list cards or clicking agents.
 
-Works with Claude Code (CLI, desktop, IDE), Codex (CLI, desktop, IDE) and Gemini CLI — anything that writes session logs to disk. (Google Antigravity keeps its conversations in an undocumented binary store and isn't supported yet.)
+Works with Claude Code (CLI, desktop, IDE), Codex (CLI, desktop, IDE), Gemini CLI,
+Kimi Code, DeepSeek Harness (DSH) and Grok Build through their local session
+logs. (Google Antigravity keeps its conversations in an undocumented binary
+store and isn't supported yet.)
 
 ## Options
 
@@ -87,8 +90,39 @@ No hooks, no config, no API keys. Both tools already append every message and to
 - Claude Code: `~/.claude/projects/<project>/<session>.jsonl` (+ `subagents/`)
 - Codex: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`. Date folders record when a chat started; discovery checks all dates and uses log modification times to find recently active chats, including months-old conversations. Inactive log contents are not read.
 - Gemini CLI: `~/.gemini/tmp/<project>/chats/session-*.jsonl` (project paths from `~/.gemini/projects.json`)
+- Kimi Code: `~/.kimi-code/sessions/<project>/<session>/agents/<agent>/wire.jsonl`, with names and folders from `state.json`
+- DSH: `~/.dsh/sessions/<project>/<session>/session[.vN].jsonl[.zstd]`; only the latest format in a session folder is read
+- Grok Build: `~/.grok/sessions/<project>/<session>/updates.jsonl`, with metadata from `summary.json`
 
 `whatsmyagentdoing` tails those files (read-only), turns the latest event into a status, and pushes it to the page over Server-Sent Events. Set `CLAUDE_CONFIG_DIR` / `CODEX_HOME` / `GEMINI_CLI_HOME` if yours live elsewhere.
+
+Kimi Code, DSH and Grok Build use `KIMI_CODE_HOME`, `DSH_HOME` and `GROK_HOME`
+respectively to override their home directories. Each native session gets its
+own person; Kimi's separate agent wire files and explicitly identified DSH and
+Grok subagent sessions use the existing subagent filter. These clients use
+locally bundled Magpie icons in the existing badge positions, with initials
+as a loading fallback. Resume buttons use `kimi --session`,
+`dsh tui --resume` and `grok --resume`, respectively.
+
+Kimi's `turn.ended` / `agent.turn.ended`, DSH's `turn/end` and Grok's
+`turn_completed` drive completed, interrupted and failed states. Individual
+model calls, finished tools and background subtasks never mark the main turn
+Done. Kimi interaction requests and DSH approval requests show Waiting for you.
+Grok's persisted tool Pending state does not prove an approval wait, so it
+remains Running. A reply without a terminal turn event eventually becomes
+Idle, never Done merely from a timeout.
+
+Kimi and Grok logs are replayed in full on discovery, in bounded read blocks,
+then tailed incrementally. Skipping the middle would lose pending tools and
+approvals. Incomplete lines and UTF-8 characters wait for the next append.
+
+DSH's compressed logs use Node's built-in zstd decoder after a one-time
+concatenated-frame check, otherwise the existing `zstd` executable on PATH.
+Nothing is installed automatically. Compressed DSH logs cannot be read without either decoder;
+the dashboard warns and other clients continue. DSH replays changed logs
+whole, bounded to 128 MB of decoded data. An incomplete compressed write
+preserves the last readable snapshot and is retried. Large unsupported logs
+are reported rather than truncated into a misleading status.
 
 **Privacy:** nothing leaves your machine. The server binds to `127.0.0.1` only and rejects requests that aren't addressed to localhost. No runtime dependencies — read `src/` in five minutes. (`web/office3d.js` is the 3D source; `npm run build` bundles it with three.js into `public/office3d.js`.)
 
@@ -102,6 +136,11 @@ No hooks, no config, no API keys. Both tools already append every message and to
 ## Development checks
 
 `npm run test:watcher` runs isolated filesystem regression checks for session discovery, resumed old chats, the hours window, unreadable paths and large logs. It requires Node.js 18+ and never reads your real agent history.
+
+`npm run test:clients` checks isolated Kimi Code, DSH and Grok histories,
+including concurrent tools, approvals, explicit turn endings, metadata
+changes, forks, subagents and DSH compressed-log recovery. Compressed checks
+need either Node's zstd support or the `zstd` executable.
 
 Browser development checks require Node.js 20+ (the dashboard itself still runs on Node.js 18+). Run `npm install`, then `npm run build` to rebuild the committed 3D bundle. With Google Chrome installed, `npm run test:ui` runs the browser regression checks against a temporary local server and made-up sessions. Use `WMAD_HEADED=1 npm run test:ui` to see the test windows, or set `WMAD_SCREENSHOTS` to an output folder to save screenshots. The checks cover logo rendering, compact views, settings synchronization, notifications, PiP recovery, video-stream cleanup and responsive settings in light and dark themes. They use Chrome; Firefox and Safari's native video controls still need manual testing.
 

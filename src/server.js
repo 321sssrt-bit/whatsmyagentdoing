@@ -13,7 +13,7 @@ const STATIC = {
   '/i18n.js': ['i18n.js', 'text/javascript; charset=utf-8'],
   '/popout.js': ['popout.js', 'text/javascript; charset=utf-8'],
 };
-const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png', '.json': 'application/json' };
+const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 // 3D models, served as-is (3D view only).
 const MOUNTS = { '/assets/': path.join(__dirname, '..', 'assets') };
 const scenes = require('./scenes');
@@ -38,7 +38,8 @@ const ACTIVE = new Set(['thinking', 'tool', 'typing']);
 function view(s, now, { privacy }) {
   const quiet = now - (s.lastEventAt || s.mtime || now);
   let status = s.status;
-  if (status === 'typing' && quiet > 45_000) status = 'done';
+  if (status === 'typing' && !s.explicitLifecycle && quiet > 45_000) status = 'done';
+  if (status === 'typing' && s.explicitLifecycle && quiet > 15 * 60_000) status = 'idle';
   if (status === 'thinking' && quiet > 15 * 60_000) status = 'idle';
   if (status === 'tool' && quiet > 45 * 60_000) status = 'idle';
   if ((status === 'waiting' || status === 'error') && quiet > 2 * 3600_000) status = 'idle';

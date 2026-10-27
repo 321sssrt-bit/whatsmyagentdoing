@@ -17,3 +17,17 @@ Retrieved 2026-10-25, artwork unchanged:
 - `gemini.png`: Google's official Gemini product icon, downloaded from
   https://www.gstatic.com/lamda/images/gemini_sparkle_4g_512_lt_f94943af3be039176192d.png
   (linked by https://gemini.google.com/).
+
+Added 2026-10-26 from Magpie's bundled client icons, with the SVG artwork unchanged:
+
+- `kimi.svg`: `internal/gui/assets/icons/kimi.svg`.
+- `dsh.svg`: `internal/gui/assets/icons/deepseek-color.svg`, the icon Magpie
+  assigns to DeepSeek Harness.
+- `grok.svg`: `internal/gui/assets/icons/xai.svg`, the icon Magpie assigns to
+  Grok Build.
+
+Source project: https://github.com/yetone/magpie. Its MIT notice is included
+in `MAGPIE-LICENSE`; trademark ownership remains with the respective brands.
+Monochrome Kimi and xAI marks retain their transparent backgrounds. The UI
+displays them in black on light themes and white on dark themes; the SVG
+geometry is not modified.

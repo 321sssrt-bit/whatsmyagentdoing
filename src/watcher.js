@@ -8,8 +8,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { EventEmitter } = require('events');
+const { StringDecoder } = require('string_decoder');
 const crypto = require('crypto');
 const { newSession, applyClaude, applyCodex, applyGemini, applyGeminiDocument } = require('./parsers');
+const { clientFiles, metadata, applyKimi, applyDsh, applyGrok, readDsh } = require('./clients');
 
 const HEAD_BYTES = 128 * 1024;
 const TAIL_BYTES = 768 * 1024;
@@ -26,6 +28,11 @@ const GEMINI_HOMES = [
   path.join(home, '.cache', '.gemini'),
 ];
 const GEMINI_DIR = path.join(GEMINI_HOMES[0], 'tmp');
+const CLIENT_DIRS = {
+  kimi: path.join(process.env.KIMI_CODE_HOME || path.join(home, '.kimi-code'), 'sessions'),
+  dsh: path.join(process.env.DSH_HOME || path.join(home, '.dsh'), 'sessions'),
+  grok: path.join(process.env.GROK_HOME || path.join(home, '.grok'), 'sessions'),
+};
 
 function ls(dir) {
   try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
@@ -35,14 +42,14 @@ function statSafe(f) {
   try { return fs.statSync(f); } catch { return null; }
 }
 
-function readRange(file, start, end) {
+function readRange(file, start, end, decoder) {
   const len = Math.max(0, end - start);
   if (!len) return '';
   const fd = fs.openSync(file, 'r');
   try {
     const buf = Buffer.alloc(len);
     fs.readSync(fd, buf, 0, len, start);
-    return buf.toString('utf8');
+    return decoder ? decoder.write(buf) : buf.toString('utf8');
   } finally {
     fs.closeSync(fd);
   }
@@ -128,6 +135,7 @@ class Watcher extends EventEmitter {
     this.interval = interval;
     this.trackers = new Map(); // file -> { session, offset, partial, apply }
     this.failed = new Map();   // file -> retry-after time, for logs we couldn't read
+    this.dshWarned = false;
     this.codexNames = new Map();
     this.geminiProjects = new Map(); // tmp dir name -> project path
     this.geminiRegistryMtime = 0;
@@ -187,7 +195,7 @@ class Watcher extends EventEmitter {
     // Directory walk every 5s; stat known files every tick.
     if (now - this.lastScan > 5000) {
       this.lastScan = now;
-      this.candidates = [...claudeFiles(), ...codexFiles(since), ...geminiFiles()];
+      this.candidates = [...claudeFiles(), ...codexFiles(since), ...geminiFiles(), ...clientFiles(CLIENT_DIRS, since)];
     }
 
     for (const c of this.candidates) {
@@ -197,8 +205,17 @@ class Watcher extends EventEmitter {
       try {
         if (this.track(c, since)) changed = true;
       } catch {
-        this.failed.set(c.file, now + 60000);
-        this.trackers.delete(c.file);
+        if (c.agent === 'dsh') {
+          // A zstd frame may be half-written. Keep the last readable snapshot.
+          this.failed.set(c.file, now + 1000);
+          if (!this.dshWarned) {
+            console.error('DSH: log decoding failed; keeping the last readable state and retrying. See the zstd requirements and size limit in README.');
+            this.dshWarned = true;
+          }
+        } else {
+          this.failed.set(c.file, now + 60000);
+          this.trackers.delete(c.file);
+        }
       }
     }
 
@@ -221,17 +238,24 @@ class Watcher extends EventEmitter {
     }
     let changed = false;
     if (t.whole && (st.mtimeMs !== t.mtime || st.size !== t.offset)) {
-      // legacy single-document session: re-read it whole
-      this.trackers.delete(c.file);
+      // Whole documents and compressed streams are replaced only after reading.
       this.open(c, st);
       return true;
     } else if (st.size > t.offset) {
-      this.feed(t, readRange(c.file, t.offset, st.size), false);
+      this.feed(t, readRange(c.file, t.offset, st.size, t.decoder), false);
       t.offset = st.size;
       changed = true;
     } else if (st.size < t.offset) {
       // File was rewritten; start over.
       this.trackers.delete(c.file);
+    }
+    if (c.metadata) {
+      const meta = statSafe(c.metadata);
+      if (meta && (meta.mtimeMs !== t.metaMtime || meta.size !== t.metaSize)) {
+        metadata(t.session, c.agent, c.metadata);
+        t.metaMtime = meta.mtimeMs; t.metaSize = meta.size;
+        changed = true;
+      }
     }
     t.session.mtime = st.mtimeMs;
     return changed;
@@ -239,24 +263,47 @@ class Watcher extends EventEmitter {
 
   open(c, st) {
     const session = newSession(c.agent, c.id, c.file);
+    if (c.sessionId) session.sessionId = c.sessionId;
     if (c.parentId) { session.parentId = c.parentId; session.subagent = true; }
     session.mtime = st.mtimeMs;
     if (c.agent === 'gemini') session.geminiProject = c.project;
-    const apply = { claude: applyClaude, codex: applyCodex, gemini: applyGemini }[c.agent];
+    const apply = { claude: applyClaude, codex: applyCodex, gemini: applyGemini, kimi: applyKimi, dsh: applyDsh, grok: applyGrok }[c.agent];
     const t = { session, offset: st.size, partial: '', apply, mtime: st.mtimeMs };
+    if (c.agent === 'dsh') {
+      t.whole = true;
+      this.feed(t, readDsh(c.file), false);
+      if (!session._dshHeader) throw new Error('DSH header is not readable yet');
+      for (const [file, old] of this.trackers) {
+        if (old.session.agent === 'dsh' && old.session.id === session.id) this.trackers.delete(file);
+      }
+      this.trackers.set(c.file, t);
+      return t;
+    }
     if (c.agent === 'gemini' && c.file.endsWith('.json')) {
       t.whole = true;
       try { applyGeminiDocument(session, JSON.parse(readRange(c.file, 0, st.size))); } catch {}
       this.trackers.set(c.file, t);
       return t;
     }
-    if (st.size <= HEAD_BYTES + TAIL_BYTES) {
+    if (c.agent === 'kimi' || c.agent === 'grok') {
+      // Pending tools and approvals need every event, including the middle.
+      // Keep the decoder for later appends that split a UTF-8 character.
+      t.decoder = new StringDecoder('utf8');
+      for (let start = 0; start < st.size; start += TAIL_BYTES) {
+        this.feed(t, readRange(c.file, start, Math.min(start + TAIL_BYTES, st.size), t.decoder), false);
+      }
+    } else if (st.size <= HEAD_BYTES + TAIL_BYTES) {
       this.feed(t, readRange(c.file, 0, st.size), false);
     } else {
       // Big log: head for metadata (cwd, title, model), tail for current state.
       this.feed(t, readRange(c.file, 0, HEAD_BYTES), true);
       t.partial = '';
       this.feed(t, readRange(c.file, st.size - TAIL_BYTES, st.size), false, true);
+    }
+    if (c.metadata) {
+      metadata(session, c.agent, c.metadata);
+      const meta = statSafe(c.metadata);
+      t.metaMtime = meta?.mtimeMs; t.metaSize = meta?.size;
     }
     this.trackers.set(c.file, t);
     return t;
@@ -296,4 +343,4 @@ class Watcher extends EventEmitter {
   }
 }
 
-module.exports = { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR };
+module.exports = { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR, CLIENT_DIRS };
