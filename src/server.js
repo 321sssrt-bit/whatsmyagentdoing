@@ -40,13 +40,14 @@ function view(s, now, { privacy }) {
   let status = s.status;
   if (status === 'typing' && !s.explicitLifecycle && quiet > 45_000) status = 'done';
   if (status === 'typing' && s.explicitLifecycle && quiet > 15 * 60_000) status = 'idle';
-  if (status === 'thinking' && quiet > 15 * 60_000) status = 'idle';
+  if (status === 'thinking' && s.source !== 'magpie' && quiet > 15 * 60_000) status = 'idle';
   if (status === 'tool' && quiet > 45 * 60_000) status = 'idle';
   if ((status === 'waiting' || status === 'error') && quiet > 2 * 3600_000) status = 'idle';
 
   const out = {
     key: `${s.agent}:${s.id}`,
     agent: s.agent,
+    ...(s.source === 'magpie' ? { source: s.source, agentName: s.agentName } : {}),
     id: s.id,
     sessionId: s.sessionId || null,
     parentId: s.parentId,

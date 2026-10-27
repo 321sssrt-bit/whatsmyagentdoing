@@ -35,7 +35,11 @@ Reads (never writes):
   ${GEMINI_DIR}
   ${Object.values(CLIENT_DIRS).join('\n  ')}
 Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.
-Other clients: KIMI_CODE_HOME / DSH_HOME / GROK_HOME.`;
+Other clients: KIMI_CODE_HOME / DSH_HOME / GROK_HOME.
+Optional Magpie: WMAD_MAGPIE_URL=http://127.0.0.1:3430
+and WMAD_MAGPIE_KEY (web sign-in key, server-side only).
+For multiple local instances, WMAD_MAGPIE_SOURCES is a JSON array
+of {url, key} objects, used instead of the single-source variables.`;
 
 function parseArgs(argv) {
   const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null, update: false };
@@ -165,6 +169,10 @@ async function main() {
     w.tick();
     w.lastScan = 0;
     w.tick();
+    await Promise.all(w.magpies.map((source) => source.poll()));
+    for (const [i, source] of w.magpies.entries()) {
+      if (source.error) throw new Error(`Magpie source ${i + 1}: ${source.error}`);
+    }
     console.log(JSON.stringify(snapshot(w, o).sessions, null, 2));
     return;
   }
@@ -211,4 +219,4 @@ async function main() {
   listen(o.port, 10);
 }
 
-main();
+main().catch((err) => { console.error(err.message); process.exitCode = 1; });

@@ -177,6 +177,34 @@ async function drawnLogos(target) {
   await openSettings(page);await page.click('h1');
   assert.equal(await page.locator('#settingsPanel').isVisible(),false);
   }
+  const magpieSessions = [
+   ...sessions,
+   {key:'opencode:remote',id:'remote',agent:'opencode',agentName:'OpenCode',source:'magpie',status:'thinking',title:'Gateway task',lastEventAt:Date.now()},
+   {key:'magpie:remote',id:'remote',agent:'magpie',agentName:'Magpie',source:'magpie',status:'idle',lastEventAt:Date.now()},
+  ];
+  await page.evaluate(s=>onData({now:Date.now(),sessions:s}),magpieSessions);
+  await page.click('#viewSeg [data-v=list]');
+  assert.equal(await page.locator('[data-key="opencode:remote"] .agent').innerText(),'OpenCode');
+  assert.equal(await page.locator('[data-key="opencode:remote"] .copy').count(),0);
+  assert.equal(await page.locator('[data-key="claude:one"] .copy').count(),1);
+  await openSettings(page);await page.click('#agentSeg [data-v=opencode]');
+  assert.equal(await page.locator('.card').count(),1);
+  assert.equal(await page.locator('#activeFilter').innerText(),'OpenCode');
+  await page.evaluate(s=>onData({now:Date.now(),sessions:s.map(x=>x.source==='magpie'?{...x,status:'idle'}:x)}),magpieSessions);
+  assert.equal(await page.locator('.card').count(),0);
+  await openSettings(page);await page.check('#showIdle');
+  assert.equal(await page.locator('.card').count(),1);
+  await page.reload();await page.waitForFunction(()=>state.loaded);
+  await page.evaluate(s=>{__events.close();onData({now:Date.now(),sessions:s})},magpieSessions);
+  assert.equal(await page.evaluate(()=>state.agent),'opencode');
+  await openSettings(page);await page.click('#agentSeg [data-v=all]');
+  await page.click('#viewSeg [data-v=office]');
+  for (const quality of ['mid','high']) {
+   await page.click(`#qualSeg [data-v=${quality}]`);
+   await page.waitForFunction(q=>officeKind.startsWith(q)&&office.framesShown>4&&(q!=='high'||office.loaded),quality);
+   assert.equal(await page.evaluate(()=>office.people.has('opencode:remote')),true);
+  }
+  check('Magpie clients reuse list, filters, idle visibility and both offices without invalid resume commands');
   const nativeClients = [
    {key:'kimi:one',id:'one',sessionId:'one',agent:'kimi',status:'thinking',cwd:'/demo/kimi'},
    {key:'dsh:two',id:'two',agent:'dsh',status:'waiting',activity:'Shell',cwd:'/demo/dsh'},

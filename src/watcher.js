@@ -11,6 +11,7 @@ const { EventEmitter } = require('events');
 const { StringDecoder } = require('string_decoder');
 const crypto = require('crypto');
 const { newSession, applyClaude, applyCodex, applyGemini, applyGeminiDocument } = require('./parsers');
+const { Magpie } = require('./magpie');
 const { clientFiles, metadata, applyKimi, applyDsh, applyGrok, readDsh } = require('./clients');
 
 const HEAD_BYTES = 128 * 1024;
@@ -129,7 +130,8 @@ function codexFiles(sinceMs) {
 }
 
 class Watcher extends EventEmitter {
-  constructor({ hours = 24, interval = 1000 } = {}) {
+  constructor({ hours = 24, interval = 1000, magpieSources = process.env.WMAD_MAGPIE_SOURCES,
+    magpieUrl = process.env.WMAD_MAGPIE_URL, magpieKey = process.env.WMAD_MAGPIE_KEY } = {}) {
     super();
     this.windowMs = hours * 3600 * 1000;
     this.interval = interval;
@@ -142,15 +144,29 @@ class Watcher extends EventEmitter {
     this.codexIndexMtime = 0;
     this.lastScan = 0;
     this.candidates = [];
+    if (typeof magpieSources === 'string') {
+      try { magpieSources = JSON.parse(magpieSources); } catch { throw new Error('WMAD_MAGPIE_SOURCES must be a JSON array of {url, key} objects'); }
+    }
+    const sources = magpieSources ?? (magpieUrl ? [{ url: magpieUrl, key: magpieKey }] : []);
+    if (!Array.isArray(sources) || sources.some((s) => !s || typeof s.url !== 'string' || typeof s.key !== 'string')) {
+      throw new Error('WMAD_MAGPIE_SOURCES must be an array of {url, key} objects');
+    }
+    this.magpies = sources.map(({ url, key }, i) => {
+      const source = new Magpie({ url, key, hours });
+      source.on('change', () => this.emit('change'));
+      source.on('warning', (message) => console.error(`Magpie source ${i + 1}: ${message}; its sessions are idle. Retrying.`));
+      return source;
+    });
   }
 
   start() {
     this.tick();
+    for (const source of this.magpies) source.start();
     this.timer = setInterval(() => this.tick(), this.interval);
     return this;
   }
 
-  stop() { clearInterval(this.timer); }
+  stop() { clearInterval(this.timer); for (const source of this.magpies) source.stop(); }
 
   loadCodexIndex() {
     const st = statSafe(CODEX_INDEX);
@@ -339,7 +355,36 @@ class Watcher extends EventEmitter {
       }
       out.push(s);
     }
-    return out;
+    if (!this.magpies.length) return out;
+    const remote = new Map();
+    // Magpie's native records carry richer metadata than gateway projections.
+    // Prefer those, then the newest record; any healthy in-flight call counts.
+    const records = this.magpies.flatMap((m) => m.sessions())
+      .sort((a, b) => Number(a.gateway) - Number(b.gateway) || b.lastEventAt - a.lastEventAt);
+    for (const s of records) {
+      const key = `${s.agent}:${s.id}`;
+      const other = remote.get(key);
+      if (!other) { remote.set(key, { ...s }); continue; }
+      for (const field of ['title', 'cwd', 'model', 'agentName', 'parentId', 'startedAt']) {
+        if (!other[field]) other[field] = s[field];
+      }
+      other.subagent ||= s.subagent;
+      if (s.status === 'thinking') other.status = 'thinking';
+      other.lastEventAt = Math.max(other.lastEventAt, s.lastEventAt);
+    }
+    const merged = out.map((s) => {
+      // Gemini's file name can differ from its ID. Kimi children instead carry
+      // the parent sessionId for resume, which must not consume the parent's row.
+      const alias = s.agent === 'gemini' && s.sessionId;
+      const other = remote.get(`${s.agent}:${s.id}`) || (alias && remote.get(`${s.agent}:${alias}`));
+      remote.delete(`${s.agent}:${s.id}`);
+      if (alias) remote.delete(`${s.agent}:${alias}`);
+      // Do not write fallback metadata into the native tracker: its own title
+      // may arrive later, or the gateway may disappear.
+      return other ? { ...s, title: s.title || other.title, cwd: s.cwd || other.cwd, model: s.model || other.model,
+        parentId: s.parentId || other.parentId, subagent: s.subagent || other.subagent } : s;
+    });
+    return merged.concat([...remote.values()]);
   }
 }
 

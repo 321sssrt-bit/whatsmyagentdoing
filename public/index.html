@@ -329,7 +329,7 @@ function validPreference(k, v) {
   if (typeof PREF_DEFAULTS[k] === 'boolean') return typeof v === 'boolean';
   if (k === 'view') return ['office', 'list'].includes(v);
   if (k === 'quality') return ['mid', 'high'].includes(v);
-  if (k === 'agent') return ['all', ...Object.keys(OFFICE_AGENT_BADGES)].includes(v);
+  if (k === 'agent') return typeof v === 'string' && /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v) && !Object.hasOwn(Object.prototype, v);
   if (k === 'lang') return v === 'auto' || Object.hasOwn(I18N, v);
   return typeof v === 'string' && /^[a-z0-9-]+$/.test(v);
 }
@@ -405,13 +405,14 @@ function timeLabel(s, now) {
 // is expanded, so a folder or session name can't run anything when pasted.
 const shq = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
 function resumeCmd(s) {
+  if (s.source === 'magpie') return '';
   const cd = s.cwd ? `cd ${shq(s.cwd)} && ` : '';
   if (s.agent === 'claude') return `${cd}claude --resume ${shq(s.id)}`;
   if (s.agent === 'gemini') return `${cd}gemini --resume ${shq(s.sessionId || s.id)}`;
   if (s.agent === 'kimi') return `${cd}kimi --session ${shq(s.sessionId || s.id)}`;
   if (s.agent === 'dsh') return `${cd}dsh tui --resume ${shq(s.id)}`;
   if (s.agent === 'grok') return `${cd}grok --resume ${shq(s.id)}`;
-  return `${cd}codex resume ${shq(s.id)}`;
+  return s.agent === 'codex' ? `${cd}codex resume ${shq(s.id)}` : '';
 }
 
 function agentLogo(agent) {
@@ -419,12 +420,14 @@ function agentLogo(agent) {
   return badge ? `<img class="agent-logo${badge.mono ? ' mono' : ''}" src="${badge.logo}" alt="" aria-hidden="true">` : '';
 }
 
-function addAgentFilter(agent) {
+function addAgentFilter(agent, name = AGENT_NAME[agent] || agent) {
   const button = document.createElement('button');
   button.dataset.v = agent;
-  button.innerHTML = `${agentLogo(agent)}${esc(AGENT_NAME[agent])}`;
+  button.innerHTML = `${agentLogo(agent)}${esc(name)}`;
   document.getElementById('agentSeg').append(button);
-  document.getElementById('agentLegend').insertAdjacentHTML('beforeend', `<span>${agentLogo(agent)}${esc(AGENT_NAME[agent])}</span>`);
+  if (OFFICE_AGENT_BADGES[agent]) {
+    document.getElementById('agentLegend').insertAdjacentHTML('beforeend', `<span>${agentLogo(agent)}${esc(AGENT_NAME[agent])}</span>`);
+  }
 }
 
 function card(s, now) {
@@ -439,14 +442,14 @@ function card(s, now) {
   return `
   <div class="card${s.subagent ? ' sub' : ''}${state.flash.has(s.key) ? ' flash' : ''}" data-s="${s.status}" data-key="${esc(s.key)}">
     <div class="top">
-      <span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}${esc(AGENT_NAME[s.agent] || s.agent)}</span>
+      <span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}${esc(s.agentName || AGENT_NAME[s.agent] || s.agent)}</span>
       <span class="project" title="${esc(s.cwd)}">${esc(project)}</span>
       <span class="time" data-time="${esc(s.key)}">${esc(timeLabel(s, now))}</span>
     </div>
     ${title}
     <div class="status"><span class="ind"><i></i><i></i><i></i></span><span class="lbl">${esc(L[s.status] || s.status)}</span>${act}</div>
     ${err}${q}${r}
-    <div class="foot"><span class="model">${esc((s.model || '') + sub)}</span><button class="copy" data-copy="${esc(resumeCmd(s))}">${L.copy}</button></div>
+    <div class="foot"><span class="model">${esc((s.model || '') + sub)}</span>${resumeCmd(s) ? `<button class="copy" data-copy="${esc(resumeCmd(s))}">${L.copy}</button>` : ''}</div>
   </div>`;
 }
 
@@ -523,9 +526,10 @@ function tickTimes() {
 
 function onData(data) {
   for (const s of data.sessions) {
-    if (!Object.hasOwn(OFFICE_AGENT_BADGES, s.agent)) continue;
+    if (!validPreference('agent', s.agent)) continue;
+    if (!Object.hasOwn(AGENT_NAME, s.agent)) AGENT_NAME[s.agent] = s.agentName || s.agent;
     if (!document.querySelector(`#agentSeg button[data-v="${s.agent}"]`)) {
-      addAgentFilter(s.agent);
+      addAgentFilter(s.agent, s.agentName || AGENT_NAME[s.agent] || s.agent);
     }
   }
   state.skew = Date.now() - data.now;
