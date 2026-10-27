@@ -62,7 +62,7 @@ The toolbar keeps the view, 2D/3D and pop-out controls visible. Scene selection,
 When Document PiP isn't available, **Pop out** in office view starts a local, view-only video preview of the 2D or 3D office. Use its video PiP button, or the browser's own video controls/context menu (such as Firefox's), to float it. Stop the preview when finished. No screen-sharing permission is needed and no video is uploaded. Background animation may run at a lower frame rate, depending on browser throttling; this fallback doesn't support list cards or clicking agents.
 
 Works with Claude Code (CLI, desktop, IDE), Codex (CLI, desktop, IDE), Gemini CLI,
-Kimi Code, DeepSeek Harness (DSH) and Grok Build through their local session
+OMP, Kimi Code, DeepSeek Harness (DSH) and Grok Build through their local session
 logs. (Google Antigravity keeps its conversations in an undocumented binary
 store and isn't supported yet.)
 
@@ -107,6 +107,9 @@ Grok subagent sessions use the existing subagent filter. These clients use
 locally bundled Magpie icons in the existing badge positions, with initials
 as a loading fallback. Resume buttons use `kimi --session`,
 `dsh tui --resume` and `grok --resume`, respectively.
+
+The office legend follows the current sessions and client/subagent filters:
+clients appear when present and disappear when no matching sessions remain.
 
 Kimi's `turn.ended` / `agent.turn.ended`, DSH's `turn/end` and Grok's
 `turn_completed` drive completed, interrupted and failed states. Individual

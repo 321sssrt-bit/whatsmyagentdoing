@@ -204,6 +204,7 @@ async function drawnLogos(target) {
   ].map(s=>({...s,lastEventAt:Date.now()}));
   await page.evaluate(s=>{state.agent='all';state.showSub=false;onData({now:Date.now(),sessions:s})},nativeClients);
   await page.evaluate(s=>onData({now:Date.now(),sessions:s}),nativeClients);
+  assert.equal(await page.locator('#agentLegend img').count(),3, 'old providers leave the legend');
   for (const agent of ['kimi','dsh','grok']) {
    assert.equal(await page.locator(`#agentSeg button[data-v="${agent}"]`).count(),1);
    const logo=page.locator(`#agentSeg button[data-v="${agent}"] img`);
@@ -221,6 +222,8 @@ async function drawnLogos(target) {
   assert.match(await page.locator('[data-key="grok:three"] .copy').getAttribute('data-copy'),/grok --resume 'three'/);
   await openSettings(page);await page.click('#agentSeg [data-v=kimi] img');
   assert.equal(await page.locator('.card').count(),1);
+  assert.equal(await page.locator('#agentLegend img').count(),1);
+  assert.equal(await page.locator('#agentLegend img').getAttribute('src'),'/assets/agents/kimi.svg');
   await openSettings(page);await page.check('#showSub');
   assert.equal(await page.locator('.card').count(),2);
   await openSettings(page);await page.click('#agentSeg [data-v=all]');
@@ -228,11 +231,22 @@ async function drawnLogos(target) {
   for (const quality of ['mid','high']) {
    await page.click(`#qualSeg [data-v=${quality}]`);
    await page.waitForFunction(q=>officeKind.startsWith(q)&&office.framesShown>4&&(q!=='high'||office.loaded),quality);
+   // Reused renderers animate the previous fixture's people walking out.
+   await page.waitForFunction(keys=>office.people.size===keys.length&&keys.every(k=>office.people.has(k)),nativeClients.map(s=>s.key));
    assert.deepEqual([...new Set(await badges(page))].sort(),['Ds','Gr','Ki']);
    assert.deepEqual(await drawnLogos(page),['dsh','grok','kimi']);
    assert.equal(await page.evaluate(()=>office.people.has('kimi:one/agent-1')),true);
+   await page.evaluate(s=>onData({now:Date.now(),sessions:s.filter(x=>x.agent==='kimi')}),nativeClients);
+   assert.equal(await page.locator('#agentLegend img').count(),1, 'two Kimi sessions share one legend entry');
+   await page.evaluate(()=>onData({now:Date.now(),sessions:[]}));
+   assert.equal(await page.locator('#agentLegend img').count(),0);
+   assert.equal(await page.locator('#agentLegend').isHidden(),true);
+   await page.evaluate(s=>onData({now:Date.now(),sessions:s}),nativeClients);
+   assert.equal(await page.locator('#agentLegend img').count(),3);
+   assert.equal(await page.locator('#agentLegend').isVisible(),true);
   }
   check('Kimi, DSH and Grok support filters, subagents, resume commands and packaged logos in both offices');
+  check('agent legends follow current sessions and filters, disappear when empty and return without duplicates in 2D/3D');
   for (const colorScheme of ['light','dark']) {
    await page.emulateMedia({colorScheme});
    await page.click('#viewSeg [data-v=list]');

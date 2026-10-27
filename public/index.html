@@ -275,7 +275,7 @@
   <div id="officeWrap">
     <div class="office loading" id="office"><div class="office-loader"><div class="spin"></div><span id="loaderText"></span></div></div>
     <div class="legend" id="legend"></div>
-    <div class="legend" id="agentLegend"></div>
+    <div class="legend" id="agentLegend" hidden></div>
   </div>
   <main id="main"></main>
 </div>
@@ -426,7 +426,6 @@ function addAgentFilter(agent) {
   button.dataset.v = agent;
   button.innerHTML = `${agentLogo(agent)}${esc(AGENT_NAME[agent])}`;
   document.getElementById('agentSeg').append(button);
-  document.getElementById('agentLegend').insertAdjacentHTML('beforeend', `<span>${agentLogo(agent)}${esc(AGENT_NAME[agent])}</span>`);
 }
 
 function card(s, now) {
@@ -488,6 +487,12 @@ function render() {
     office.setVisible(officeMode && !poppedOut);
     office.update(officeList);
   }
+  const agents = new Set(officeList.map(s => s.agent));
+  const legend = document.getElementById('agentLegend');
+  const labels = Object.keys(OFFICE_AGENT_BADGES).filter(agent => agents.has(agent))
+    .map(agent => `<span>${agentLogo(agent)}${esc(AGENT_NAME[agent])}</span>`).join('');
+  if (legend.innerHTML !== labels) legend.innerHTML = labels;
+  legend.hidden = !state.showAgent || !labels;
   document.getElementById('idleToggle').style.display = officeMode ? 'none' : '';
   if (poppedOut) {
     document.getElementById('officeWrap').style.display = 'none';
@@ -604,7 +609,6 @@ function syncControls() {
   showIdle.checked = state.showIdle;
   showAgent.checked = state.showAgent;
   document.getElementById('agentBadgeToggle').style.display = state.view === 'office' ? '' : 'none';
-  document.getElementById('agentLegend').hidden = !state.showAgent;
   popout?.sync(PIP, state.view);
   if (!window.Notification) notifyBtn.style.display = 'none';
   else if (Notification.permission === 'granted') { notifyBtn.textContent = L.notifyOn; notifyBtn.disabled = true; }
