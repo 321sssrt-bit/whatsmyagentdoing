@@ -43,6 +43,7 @@
     "start": "node bin/cli.js",
     "test:ui": "node tests/ui.cjs",
     "test:watcher": "node --test tests/watcher.cjs",
+    "test:server": "node --test tests/server.cjs",
     "test:clients": "node --test tests/clients.cjs",
     "test:ui:clients": "node tests/ui-clients.cjs"
   }
