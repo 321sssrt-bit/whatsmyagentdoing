@@ -1,6 +1,8 @@
 # 👀 whatsmyagentdoing
 
-**A Claude Code / Codex skill: type `/myoffice` and see what every Claude Code, Codex and Gemini CLI agent on your machine is doing — live, in a little office.**
+**A Claude Code / Codex skill: type `/myoffice` and see what every Claude Code, Codex, Gemini CLI and OMP (oh-my-pi) agent on your machine is doing — live, in a little office.**
+
+OMP support: [paths, profiles, Resume and limitations](docs/omp.md).
 
 ![The 3D office: agents at their desks, off-duty ones wandering around](docs/office-3d.gif)
 
@@ -69,6 +71,7 @@ store and isn't supported yet.)
 ```
 -p, --port <n>    Port (default 4545; next free one if taken)
 --hours <n>       Sessions active in the last n hours (default 24)
+--omp-dir <path>  OMP sessions root, or a directory passed to omp --session-dir
 --no-open         Don't open the browser
 --private         Hide prompts, replies and titles — status only (screen-share safe)
 --json            Print one snapshot as JSON and exit
@@ -93,6 +96,7 @@ No hooks, no config, no API keys. Both tools already append every message and to
 - Kimi Code: `~/.kimi-code/sessions/<project>/<session>/agents/<agent>/wire.jsonl`, with names and folders from `state.json`
 - DSH: `~/.dsh/sessions/<project>/<session>/session[.vN].jsonl[.zstd]`; only the latest format in a session folder is read
 - Grok Build: `~/.grok/sessions/<project>/<session>/updates.jsonl`, with metadata from `summary.json`
+- OMP: `~/.omp/agent/sessions/<project>/*.jsonl`, plus named profiles. Override with `WMAD_OMP_SESSIONS_DIR` or `--omp-dir`. Details: [OMP](docs/omp.md).
 
 `whatsmyagentdoing` tails those files (read-only), turns the latest event into a status, and pushes it to the page over Server-Sent Events. Set `CLAUDE_CONFIG_DIR` / `CODEX_HOME` / `GEMINI_CLI_HOME` if yours live elsewhere.
 

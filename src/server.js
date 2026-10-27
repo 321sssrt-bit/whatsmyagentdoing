@@ -18,6 +18,7 @@ const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-bin
 const MOUNTS = { '/assets/': path.join(__dirname, '..', 'assets') };
 const scenes = require('./scenes');
 const updater = require('./update');
+const { ompResumeCommand } = require('./omp');
 
 function serveFile(res, root, rel) {
   const file = path.normalize(path.join(root, rel));
@@ -64,6 +65,10 @@ function view(s, now, { privacy }) {
     lastEventAt: s.lastEventAt || s.mtime,
     startedAt: s.startedAt,
   };
+  if (s.agent === 'omp') {
+    out.ompProfile = s.ompProfile || null;
+    out.resumeCommand = ompResumeCommand(s);
+  }
   if (privacy) {
     out.prompt = out.reply = out.title = null;
     if (out.activity) out.activity = out.activity.split(/[:\s]/)[0];

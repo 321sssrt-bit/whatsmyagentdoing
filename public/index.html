@@ -23,6 +23,7 @@
     --claude: #c96442;
     --codex: #10a37f;
     --gemini: #4f7cf0;
+    --omp: #a96926;
     --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
   }
   @media (prefers-color-scheme: dark) {
@@ -405,6 +406,7 @@ function timeLabel(s, now) {
 // is expanded, so a folder or session name can't run anything when pasted.
 const shq = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
 function resumeCmd(s) {
+  if (s.agent === 'omp') return s.resumeCommand || '';
   const cd = s.cwd ? `cd ${shq(s.cwd)} && ` : '';
   if (s.agent === 'claude') return `${cd}claude --resume ${shq(s.id)}`;
   if (s.agent === 'gemini') return `${cd}gemini --resume ${shq(s.sessionId || s.id)}`;
@@ -793,7 +795,7 @@ langSel.addEventListener('change', () => {
   applyLang(chooseLang(state.data.lang));
   render();
 });
-for (const agent of ['claude', 'codex', 'gemini']) addAgentFilter(agent);
+for (const agent of ['claude', 'codex', 'gemini', 'omp']) addAgentFilter(agent);
 popout = new OfficePopout({
   preferences: () => ({ ...Object.fromEntries(Object.keys(PREF_DEFAULTS).map((k) => [k, state[k]])), lang: store.get('lang', 'auto') }),
   office: () => office,
