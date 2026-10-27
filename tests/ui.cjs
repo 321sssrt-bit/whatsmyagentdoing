@@ -21,6 +21,7 @@ const sessions = [
  {key:'claude:one', id:'one', agent:'claude',project:'claude-project',status:'thinking'},
  {key:'codex:two', id:'two', agent:'codex',project:'codex-project',status:'waiting'},
  {key:'gemini:three', id:'three', agent:'gemini',project:'gemini-project',status:'tool',activity:'Read: index.js'},
+ {key:'omp:four', id:'real-omp-id', agent:'omp',project:'omp-project',status:'tool',activity:'read file.js',resumeCommand:"omp --cwd 'C:\\demo project\\O''Brien' --session-dir 'C:\\sessions' --resume 'real-omp-id'"},
  {key:'claude:done', id:'done', agent:'claude',project:'finished-project',status:'done'},
  {key:'codex:sub', id:'sub', agent:'codex',project:'sub-project',status:'thinking',subagent:true},
 ].map(s=>({...s,lastEventAt:Date.now(),turnStartedAt:Date.now()-1000,cwd:'/demo/'+s.project}));
@@ -74,30 +75,42 @@ async function drawnLogos(target) {
   const page=await context.newPage();await page.goto(base);await stable(page);
   assert.equal(await page.locator('h1 [data-t]').innerText(),"What's my agent doing");
   assert.equal(await page.locator('#showAgent').isChecked(),true);
-  assert.deepEqual([...new Set(await badges(page))].sort(),['Cl','Cx','G']);
-  assert.deepEqual(await drawnLogos(page),['claude','codex','gemini']);
-  assert.equal(await page.locator('#agentLegend img').evaluateAll(imgs=>imgs.length===3&&imgs.every(img=>img.complete&&img.naturalWidth>0)),true);
-  check('all official local logos load and draw in 2D and the legend');
+  assert.deepEqual([...new Set(await badges(page))].sort(),['Cl','Cx','G','OMP']);
+  assert.deepEqual(await drawnLogos(page),['claude','codex','gemini','omp']);
+  assert.equal(await page.locator('#agentLegend img').evaluateAll(imgs=>imgs.length===4&&imgs.every(img=>img.complete&&img.naturalWidth>0)),true);
+  check('all four agent icons load and show in 2D and the legend; OMP uses a neutral mark');
+  await openSettings(page);await page.click('#agentSeg [data-v=omp]');
+  await page.click('#viewSeg [data-v=list]');
+  assert.equal(await page.locator('.card').count(),1);
+  assert.equal(await page.locator('.card .agent.omp').innerText(),'OMP');
+  assert.equal(await page.locator('.card .copy').getAttribute('data-copy'),sessions.find(s=>s.agent==='omp').resumeCommand);
+  await page.evaluate(()=>{window.__copied=null;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copied=text}}})});
+  await page.click('.card .copy');
+  assert.equal(await page.evaluate(()=>window.__copied),sessions.find(s=>s.agent==='omp').resumeCommand);
+  await page.reload();await page.waitForFunction(()=>state.loaded);
+  assert.equal(await page.evaluate(()=>state.agent),'omp');assert.equal(await page.locator('.card').count(),1);
+  check('OMP filter, list, Resume copy and saved filter work');
+  await openSettings(page);await page.click('#agentSeg [data-v=all]');await page.click('#viewSeg [data-v=office]');
   await openSettings(page);await page.check('#showSub');
-  assert.equal((await badges(page)).length,5);
-  check('2D badges identify all three providers and subagents without duplicate activity badges');
+  assert.equal((await badges(page)).length,6);
+  check('2D shows four providers and subagents without duplicate badges');
   await openSettings(page);await page.uncheck('#showAgent');assert.equal((await badges(page)).length,0);
   assert.equal(await page.locator('#agentLegend').isVisible(),false);
   await page.reload();await stable(page);assert.equal(await page.locator('#showAgent').isChecked(),false);
   await openSettings(page);await page.check('#showAgent');check('badge toggle hides markers and legend and persists across reload');
   await page.click('#qualSeg [data-v=high]');
   await page.waitForFunction(()=>officeKind==='high:office'&&office?.loaded&&office.framesShown>4,{},{timeout:30000});
-  assert.deepEqual([...new Set(await badges(page))].sort(),['Cl','Cx','G']);
+  assert.deepEqual([...new Set(await badges(page))].sort(),['Cl','Cx','G','OMP']);
   await screenshot(page, 'office-3d');
-  assert.deepEqual(await drawnLogos(page),['claude','codex','gemini']);
-  check('3D renders the same official provider logos');
+  assert.deepEqual(await drawnLogos(page),['claude','codex','gemini','omp']);
+  check('3D shows the same four provider badges');
   if (!clientsOnly) {
   await page.click('#pipBtn');await page.waitForFunction(()=>!!popout.win);
   const pip=context.pages().find(p=>p!==page);assert.ok(pip);
   const frame=await (async()=>{for(let i=0;i<100;i++){const f=pip.frames().find(f=>f.url().includes('?pip=1'));if(f)return f;await new Promise(r=>setTimeout(r,50))}throw Error('No compact frame')})();
   await frame.waitForFunction(()=>office?.loaded&&office.framesShown>4);
   await frame.evaluate(s=>{window.__events?.close();onData({now:Date.now(),sessions:s})},sessions);
-  assert.deepEqual(await drawnLogos(frame),['claude','codex','gemini']);
+  assert.deepEqual(await drawnLogos(frame),['claude','codex','gemini','omp']);
   assert.equal(await page.evaluate(()=>office.visible),false);
   assert.equal(await frame.evaluate(()=>state.quality),'high');
   assert.equal(await frame.locator('#pipBtn').isVisible(),false);
@@ -105,6 +118,12 @@ async function drawnLogos(target) {
   await frame.waitForFunction(()=>!document.getElementById('office').classList.contains('loading'));await page.waitForTimeout(400);await screenshot(pip, 'pip-3d');
   assert.equal(await frame.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   check('real Document PiP opens 3D at compact size and suspends the main office');
+  await openSettings(page);await page.click('#agentSeg [data-v=omp]');await frame.waitForFunction(()=>state.agent==='omp');
+  await frame.click('#viewSeg [data-v=list]');
+  assert.equal(await frame.locator('.card').count(),1);
+  assert.equal(await frame.locator('.card .copy').getAttribute('data-copy'),sessions.find(s=>s.agent==='omp').resumeCommand);
+  await frame.click('#viewSeg [data-v=office]');
+  check('OMP is in the pop-out filter and list with the right Resume command');
   await openSettings(page);await page.uncheck('#showAgent');await frame.waitForFunction(()=>!state.showAgent&&!office.showAgent);
   await openSettings(page);await page.selectOption('#langSel','zh-TW');await frame.waitForFunction(()=>langCode==='zh-TW');
   await openSettings(page);await page.click('#agentSeg [data-v=codex]');await frame.waitForFunction(()=>state.agent==='codex');
@@ -180,12 +199,15 @@ async function drawnLogos(target) {
   const magpieSessions = [
    ...sessions,
    {key:'opencode:remote',id:'remote',agent:'opencode',agentName:'OpenCode',source:'magpie',status:'thinking',title:'Gateway task',lastEventAt:Date.now()},
+   {key:'omp:remote',id:'remote',agent:'omp',source:'magpie',status:'thinking',lastEventAt:Date.now()},
    {key:'magpie:remote',id:'remote',agent:'magpie',agentName:'Magpie',source:'magpie',status:'idle',lastEventAt:Date.now()},
   ];
   await page.evaluate(s=>onData({now:Date.now(),sessions:s}),magpieSessions);
   await page.click('#viewSeg [data-v=list]');
   assert.equal(await page.locator('[data-key="opencode:remote"] .agent').innerText(),'OpenCode');
   assert.equal(await page.locator('[data-key="opencode:remote"] .copy').count(),0);
+  assert.equal(await page.locator('[data-key="omp:remote"] .copy').count(),0);
+  assert.equal(await page.locator('[data-key="omp:four"] .copy').count(),1);
   assert.equal(await page.locator('[data-key="claude:one"] .copy').count(),1);
   await openSettings(page);await page.click('#agentSeg [data-v=opencode]');
   assert.equal(await page.locator('.card').count(),1);
@@ -213,6 +235,7 @@ async function drawnLogos(target) {
   ].map(s=>({...s,lastEventAt:Date.now()}));
   await page.evaluate(s=>{state.agent='all';state.showSub=false;onData({now:Date.now(),sessions:s})},nativeClients);
   await page.evaluate(s=>onData({now:Date.now(),sessions:s}),nativeClients);
+  assert.equal(await page.locator('#agentLegend img').count(),3, 'old providers leave the legend');
   for (const agent of ['kimi','dsh','grok']) {
    assert.equal(await page.locator(`#agentSeg button[data-v="${agent}"]`).count(),1);
    const logo=page.locator(`#agentSeg button[data-v="${agent}"] img`);
@@ -230,6 +253,8 @@ async function drawnLogos(target) {
   assert.match(await page.locator('[data-key="grok:three"] .copy').getAttribute('data-copy'),/grok --resume 'three'/);
   await openSettings(page);await page.click('#agentSeg [data-v=kimi] img');
   assert.equal(await page.locator('.card').count(),1);
+  assert.equal(await page.locator('#agentLegend img').count(),1);
+  assert.equal(await page.locator('#agentLegend img').getAttribute('src'),'/assets/agents/kimi.svg');
   await openSettings(page);await page.check('#showSub');
   assert.equal(await page.locator('.card').count(),2);
   await openSettings(page);await page.click('#agentSeg [data-v=all]');
@@ -237,11 +262,22 @@ async function drawnLogos(target) {
   for (const quality of ['mid','high']) {
    await page.click(`#qualSeg [data-v=${quality}]`);
    await page.waitForFunction(q=>officeKind.startsWith(q)&&office.framesShown>4&&(q!=='high'||office.loaded),quality);
+   // Reused renderers animate the previous fixture's people walking out.
+   await page.waitForFunction(keys=>office.people.size===keys.length&&keys.every(k=>office.people.has(k)),nativeClients.map(s=>s.key));
    assert.deepEqual([...new Set(await badges(page))].sort(),['Ds','Gr','Ki']);
    assert.deepEqual(await drawnLogos(page),['dsh','grok','kimi']);
    assert.equal(await page.evaluate(()=>office.people.has('kimi:one/agent-1')),true);
+   await page.evaluate(s=>onData({now:Date.now(),sessions:s.filter(x=>x.agent==='kimi')}),nativeClients);
+   assert.equal(await page.locator('#agentLegend img').count(),1, 'two Kimi sessions share one legend entry');
+   await page.evaluate(()=>onData({now:Date.now(),sessions:[]}));
+   assert.equal(await page.locator('#agentLegend img').count(),0);
+   assert.equal(await page.locator('#agentLegend').isHidden(),true);
+   await page.evaluate(s=>onData({now:Date.now(),sessions:s}),nativeClients);
+   assert.equal(await page.locator('#agentLegend img').count(),3);
+   assert.equal(await page.locator('#agentLegend').isVisible(),true);
   }
   check('Kimi, DSH and Grok support filters, subagents, resume commands and packaged logos in both offices');
+  check('agent legends follow current sessions and filters, disappear when empty and return without duplicates in 2D/3D');
   for (const colorScheme of ['light','dark']) {
    await page.emulateMedia({colorScheme});
    await page.click('#viewSeg [data-v=list]');

@@ -116,6 +116,29 @@ test('native logs win, including approvals, completion, subagents and Gemini ses
   assert.equal(JSON.stringify(safe).includes(KEY), false);
 });
 
+test('OMP gateway snapshots omit Resume while matching local logs retain it', async t => {
+  const { state, magpie } = await fixture(t);
+  state.sessions = [session('local', 'omp'), session('remote', 'omp')];
+  state.routes = [route('local', { agent: 'omp' }), route('remote', { agent: 'omp' })];
+  await magpie.poll();
+  assert.ok(snapshot(magpie, {}).sessions.every(s => s.resumeCommand === undefined));
+  const watcher = new Watcher({ magpieSources: [] });
+  watcher.magpies = [magpie];
+  watcher.trackers.set('/fake/local.jsonl', { session: {
+    ...newSession('omp', 'local', '/fake/local.jsonl'), sessionId: 'local',
+    cwd: '/fixture', status: 'waiting', lastEventAt: NOW, ompProfile: 'work',
+  } });
+  const rows = snapshot(watcher, {}).sessions;
+  assert.equal(rows.length, 2);
+  const local = rows.find(s => s.id === 'local');
+  assert.equal(local.status, 'waiting');
+  assert.equal(local.source, undefined);
+  assert.match(local.resumeCommand, /--profile 'work'.*--resume 'local'/);
+  const remote = rows.find(s => s.id === 'remote');
+  assert.equal(remote.status, 'thinking');
+  assert.equal(remote.resumeCommand, undefined);
+});
+
 test('failed polls become idle, warn once, expire and recover without leaking responses', async t => {
   const { state, magpie } = await fixture(t);
   const warnings = [];
@@ -181,7 +204,8 @@ test('redirects cannot forward the web key to another endpoint', async t => {
 
 test('dashboard JSON and SSE contain only session fields, with private titles redacted', async t => {
   const { state, magpie } = await fixture(t);
-  state.sessions = [session('one', 'opencode', { name: 'OpenCode', providerKey: KEY })];
+  state.sessions = [session('one', 'opencode', { name: 'OpenCode', providerKey: KEY }),
+    session('remote', 'omp')];
   state.routes = [route('one', { agent: 'opencode', order: [{ credential: KEY }] })];
   await magpie.poll();
   const server = createServer(magpie, { privacy: true });
@@ -193,6 +217,7 @@ test('dashboard JSON and SSE contain only session fields, with private titles re
   assert.equal(json.sessions[0].title, null);
   assert.equal(json.sessions[0].agentName, 'OpenCode');
   assert.equal(json.sessions[0].source, 'magpie');
+  assert.equal(json.sessions.find(s => s.agent === 'omp').resumeCommand, undefined);
   const res = await fetch(base + '/events');
   const reader = res.body.getReader();
   const event = new TextDecoder().decode((await reader.read()).value);
@@ -200,6 +225,7 @@ test('dashboard JSON and SSE contain only session fields, with private titles re
   assert.equal(event.includes(KEY), false);
   assert.match(event, /"status":"thinking"/);
   assert.match(event, /"title":null/);
+  assert.match(event, /"agent":"omp"/);
 });
 
 test('--json waits for Magpie, isolates native homes, applies privacy and reports authentication failure', async t => {
@@ -216,6 +242,9 @@ test('--json waits for Magpie, isolates native homes, applies privacy and report
       [{ type: 'session', id: 'dsh', createdAt: NOW }, { type: 'turn/start', time: NOW, data: {} }]],
     ['GROK_HOME', 'sessions/project/grok/updates.jsonl',
       [{ timestamp: NOW / 1000, params: { update: { sessionUpdate: 'user_message_chunk', content: { text: 'Synthetic native task' } } } }]],
+    ['WMAD_OMP_SESSIONS_DIR', 'project/native.jsonl',
+      [{ type: 'session', id: 'native-omp', cwd: '/fixture', timestamp: iso() },
+        { type: 'message', timestamp: iso(), message: { role: 'user', content: 'Synthetic native task' } }]],
   ]) {
     inheritedHomes[name] = path.join(root, name);
     const file = path.join(inheritedHomes[name], rel);
@@ -225,6 +254,7 @@ test('--json waits for Magpie, isolates native homes, applies privacy and report
   const env = { ...process.env, ...inheritedHomes, HOME: root, USERPROFILE: root, CLAUDE_CONFIG_DIR: root,
     CODEX_HOME: root, GEMINI_CLI_HOME: root, WMAD_NO_UPDATE_CHECK: '1',
     KIMI_CODE_HOME: root, DSH_HOME: root, GROK_HOME: root,
+    WMAD_OMP_SESSIONS_DIR: root,
     WMAD_MAGPIE_SOURCES: JSON.stringify([{ url: `http://127.0.0.1:${port}`, key: KEY }]) };
   const run = () => promisify(execFile)(process.execPath, [path.join(__dirname, '../bin/cli.js'), '--json', '--private'], { env });
   const result = await run();
@@ -292,6 +322,7 @@ test('--json awaits both sources and fails without emitting a partial snapshot',
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const env = { ...process.env, HOME: root, USERPROFILE: root, CLAUDE_CONFIG_DIR: root,
     CODEX_HOME: root, GEMINI_CLI_HOME: root, KIMI_CODE_HOME: root, DSH_HOME: root, GROK_HOME: root,
+    WMAD_OMP_SESSIONS_DIR: root,
     WMAD_NO_UPDATE_CHECK: '1', WMAD_MAGPIE_SOURCES: JSON.stringify([
       { url: a.magpie.url.origin, key: a.state.key },
       { url: b.magpie.url.origin, key: b.state.key },
