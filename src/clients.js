@@ -224,7 +224,10 @@ function applyGrok(s, d) {
   if (type) s._chunkType = type;
   switch (type) {
     case 'user_message_chunk':
-      if (previous !== type) { begin(s, ts); s._promptText = ''; }
+      if (previous !== type) {
+        begin(s, Number.isFinite(p._meta?.turnStartMs) ? p._meta.turnStartMs : ts);
+        s._promptText = '';
+      }
       s._promptText = ((s._promptText || '') + (e.content?.text || '')).slice(0, 1200);
       s.prompt = clean(s._promptText);
       s.model = e._meta?.modelId || s.model;

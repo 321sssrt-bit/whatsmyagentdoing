@@ -98,6 +98,17 @@ test('Grok reads ACP tool status in both locations and distinguishes failures fr
   assert.equal(s.status, 'error');
 });
 
+test('Grok keeps the recorded turn start when the first user chunk arrives later', () => {
+  const s = newSession('grok', 'one');
+  const event = grok('user_message_chunk', { content: { text: 'Hello' } });
+  event.params._meta = { turnStartMs: NOW - 5000 };
+  applyGrok(s, event);
+  assert.equal(s.turnStartedAt, NOW - 5000);
+  applyGrok(s, grok('user_message_chunk', { content: { text: ' world' } }));
+  assert.equal(s.turnStartedAt, NOW - 5000);
+  assert.equal(s.prompt, 'Hello world');
+});
+
 test('Grok preserves explicit failure and interruption reasons in snapshots', () => {
   for (const [reason, status, error] of [
     ['rate_limit', 'error', 'Rate limited'],
